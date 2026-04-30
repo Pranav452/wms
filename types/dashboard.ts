@@ -79,13 +79,14 @@ export interface RS11_POvsDispatch {
 }
 
 export interface RS12_POTracking {
-  PONO:       string
-  CLIENT:     string
-  PO_QTY:     number
-  DISPATCHED: number
-  BALANCE:    number
-  SKU_COUNT:  number
-  GIN_NOS:    string
+  PONO:               string
+  CLIENT:             string
+  PO_QTY:            number
+  DISPATCHED:        number
+  BALANCE:           number
+  SKU_COUNT:         number
+  LAST_DISPATCH_DATE: string
+  GIN_NOS:           string
 }
 
 export interface RS13_Container {

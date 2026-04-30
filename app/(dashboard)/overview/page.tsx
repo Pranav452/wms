@@ -35,7 +35,8 @@ const AGING_COLORS: Record<string, string> = {
   '0-30': '#86efac', '31-60': '#fde68a', '61-90': '#fb923c', '90+': '#ef4444',
 }
 const LABEL_COLORS = ['#22c55e', '#ef4444', '#f59e0b']
-const ARTICLE_COLORS = ['#ef4444', '#3b82f6', '#f59e0b', '#8b5cf6', '#10b981', '#ec4899', '#06b6d4', '#f97316']
+// Single-hue palette: red shades dark→light (no rainbow)
+const ARTICLE_COLORS = ['#ef4444', '#f87171', '#fca5a5', '#fecaca', '#fee2e2', '#1e1e1e', '#374151', '#6b7280']
 
 export default function OverviewPage() {
   const { data, loading, error } = useDashboard()
@@ -331,23 +332,23 @@ export default function OverviewPage() {
         {/* PO Value by Article */}
         {poValueData.length > 0 && (
           <div className="col-span-12 sm:col-span-8 bg-white rounded-2xl p-5 shadow-sm">
-            <h3 className="font-semibold text-sm text-gray-900 mb-4">PO Value by Article Type (Top 6)</h3>
-            <div className="space-y-2.5">
-              {poValueData.map((v, i) => {
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-sm text-gray-900">PO Value by Article Type</h3>
+              <span className="text-xs text-gray-400">Top {poValueData.length}</span>
+            </div>
+            <div className="space-y-3">
+              {poValueData.map((v) => {
                 const maxVal = poValueData[0].TOTAL_MRP_VALUE
+                const pct = maxVal ? (v.TOTAL_MRP_VALUE / maxVal) * 100 : 0
                 return (
-                  <div key={v.ARTICLETYPE}>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="font-medium text-gray-800 truncate max-w-[200px]">{v.ARTICLETYPE || '(none)'}</span>
-                      <span className="text-gray-500 ml-2 shrink-0">
-                        ₹{formatNumber(Math.round(v.TOTAL_MRP_VALUE / 1000))}K MRP · Avg ₹{formatNumber(Math.round(v.AVG_MRP))}
-                      </span>
+                  <div key={v.ARTICLETYPE} className="flex items-center gap-3">
+                    <span className="text-xs font-medium text-gray-700 w-20 shrink-0 truncate">{v.ARTICLETYPE || '(none)'}</span>
+                    <div className="flex-1 bg-gray-100 rounded-full h-2">
+                      <div className="h-2 rounded-full bg-red-500" style={{ width: `${pct}%` }} />
                     </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2">
-                      <div
-                        className="h-2 rounded-full"
-                        style={{ width: `${maxVal ? (v.TOTAL_MRP_VALUE / maxVal) * 100 : 0}%`, background: ARTICLE_COLORS[i % ARTICLE_COLORS.length] }}
-                      />
+                    <div className="text-right shrink-0 w-36">
+                      <span className="text-xs font-semibold text-gray-900">₹{formatNumber(Math.round(v.TOTAL_MRP_VALUE / 1000))}K</span>
+                      <span className="text-xs text-gray-400 ml-1.5">avg ₹{formatNumber(Math.round(v.AVG_MRP))}</span>
                     </div>
                   </div>
                 )

@@ -90,7 +90,9 @@ BEGIN
 
     /* ── STEP 6: Dispatched by PONO via ACKNO (fix for RS12) ── */
     IF OBJECT_ID('tempdb..#PO_DISPATCHED') IS NOT NULL DROP TABLE #PO_DISPATCHED;
-    SELECT GM.ACKNO AS PONO, DISPATCHED_QTY = SUM(GD.ISSUEQTY)
+    SELECT GM.ACKNO AS PONO,
+           DISPATCHED_QTY    = SUM(GD.ISSUEQTY),
+           LAST_DISPATCH_DATE = CONVERT(VARCHAR(10), MAX(GM.ISSUEDATE), 103)
     INTO #PO_DISPATCHED
     FROM tbl_imp_wms_goodsissue_mst GM
     JOIN tbl_imp_wms_goodsissue_dtls GD ON GD.FK_GINNO = GM.GINNO
@@ -244,11 +246,12 @@ BEGIN
     SELECT
         PO.PONO,
         PO.CLIENT,
-        PO_QTY    = SUM(CONVERT(INT, PO.QTY)),
-        DISPATCHED = ISNULL(MAX(PD.DISPATCHED_QTY), 0),
-        BALANCE    = SUM(CONVERT(INT, PO.QTY)) - ISNULL(MAX(PD.DISPATCHED_QTY), 0),
-        SKU_COUNT  = COUNT(DISTINCT PO.GTIN),
-        GIN_NOS    = ISNULL((
+        PO_QTY             = SUM(CONVERT(INT, PO.QTY)),
+        DISPATCHED         = ISNULL(MAX(PD.DISPATCHED_QTY), 0),
+        BALANCE            = SUM(CONVERT(INT, PO.QTY)) - ISNULL(MAX(PD.DISPATCHED_QTY), 0),
+        SKU_COUNT          = COUNT(DISTINCT PO.GTIN),
+        LAST_DISPATCH_DATE = ISNULL(MAX(PD.LAST_DISPATCH_DATE), ''),
+        GIN_NOS            = ISNULL((
             SELECT STUFF((
                 SELECT DISTINCT ', ' + GM.GINNO
                 FROM tbl_imp_wms_goodsissue_mst GM

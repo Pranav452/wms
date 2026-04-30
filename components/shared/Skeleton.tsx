@@ -20,8 +20,8 @@ export function KPICardSkeleton() {
 export function ChartCardSkeleton({ height = 200 }: { height?: number }) {
   return (
     <div className="bg-white rounded-2xl p-5 shadow-sm">
-      <Skeleton className="h-4 w-40 mb-5" />
-      <Skeleton className={`w-full rounded-xl`} style={{ height }} />
+      <div className="h-4 w-40 mb-5 animate-pulse bg-gray-200 rounded-lg" />
+      <div className="w-full animate-pulse bg-gray-200 rounded-xl" style={{ height }} />
     </div>
   )
 }
