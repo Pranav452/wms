@@ -72,7 +72,7 @@ export default function OverviewPage() {
 
       {/* ── Row 1: Headline KPIs ── */}
       <div className="grid grid-cols-12 gap-4 mb-4">
-        <div className="col-span-12 sm:col-span-4 bg-[#1e1e1e] rounded-2xl p-6 text-white flex flex-col justify-between relative overflow-hidden shadow-sm">
+        <div className="col-span-12 sm:col-span-4 bg-[#1e1e1e] rounded-2xl p-6 text-white flex flex-col justify-between relative shadow-sm">
           <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/30 rounded-full blur-3xl -mr-10 -mt-10" />
           <div>
             <div className="bg-red-500/20 w-10 h-10 rounded-lg flex items-center justify-center mb-4">
@@ -80,9 +80,21 @@ export default function OverviewPage() {
             </div>
             <h3 className="text-gray-400 text-sm">Total Balance Stock</h3>
           </div>
-          <div className="flex items-end justify-between mt-6">
-            <span className="text-4xl font-bold">{formatNumber(k?.BAL_QTY ?? 0)}</span>
-            <span className="text-xs bg-white/10 px-2 py-1 rounded-full">units</span>
+          <div>
+            <div className="flex items-end justify-between mt-6">
+              <span className="text-4xl font-bold">{formatNumber(k?.BAL_QTY ?? 0)}</span>
+              <span className="text-xs bg-white/10 px-2 py-1 rounded-full">units</span>
+            </div>
+            <div className="flex gap-3 mt-4">
+              <div className="flex-1 bg-white/5 rounded-xl p-3">
+                <p className="text-[10px] text-gray-400 mb-1">Finished</p>
+                <p className="text-sm font-semibold text-green-400">{formatNumber((k?.BAL_QTY ?? 0) - (k?.MRP_PENDING_QTY ?? 0))}</p>
+              </div>
+              <div className="flex-1 bg-white/5 rounded-xl p-3">
+                <p className="text-[10px] text-gray-400 mb-1">Unfinished</p>
+                <p className="text-sm font-semibold text-yellow-400">{formatNumber(k?.MRP_PENDING_QTY ?? 0)}</p>
+              </div>
+            </div>
           </div>
         </div>
 
