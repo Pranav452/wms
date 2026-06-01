@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
     const dateSlug = asondate.replace(/\//g, '-')
     const filename = `${type}-report-${dateSlug}.xls`
 
-    return new NextResponse(body, {
+    return new NextResponse(new Uint8Array(body), {
       headers: {
         'Content-Type':        'application/vnd.ms-excel',
         'Content-Disposition': `attachment; filename="${filename}"`,
