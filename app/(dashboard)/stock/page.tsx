@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from 'react'
 import Header from '@/components/layout/Header'
+import StockReportDownload from '@/components/stock/StockReportDownload'
 import DataTable, { Column } from '@/components/shared/DataTable'
 import { ErrorState } from '@/components/shared/LoadingState'
 import { StockSkeleton } from '@/components/shared/Skeleton'
@@ -66,6 +67,8 @@ export default function StockPage() {
   return (
     <>
       <Header title="Stock Detail" breadcrumb="Stock" />
+
+      <StockReportDownload />
 
       <div className="flex flex-col gap-4">
         {/* Aging quick-filter pills */}
