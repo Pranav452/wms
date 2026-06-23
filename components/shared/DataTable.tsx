@@ -53,23 +53,23 @@ export default function DataTable<T extends Record<string, unknown>>({
       {/* Toolbar */}
       <div className="p-4 border-b flex flex-wrap gap-3 items-center justify-between">
         {title && <h3 className="font-semibold text-gray-900 text-sm">{title}</h3>}
-        <div className="flex flex-wrap gap-2 items-center ml-auto">
+        <div className="flex flex-wrap gap-2 items-center w-full sm:w-auto sm:ml-auto">
           {extraFilters}
           {filterKeys.length > 0 && (
-            <div className="relative">
+            <div className="relative flex-1 min-w-[8rem] sm:flex-none">
               <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 value={query}
                 onChange={e => handleQuery(e.target.value)}
                 placeholder="Search…"
-                className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg outline-none focus:border-red-400 w-48"
+                className="pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-red-400 w-full sm:w-48"
               />
             </div>
           )}
           <select
             value={pageSize}
             onChange={e => handleSize(Number(e.target.value))}
-            className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-red-400"
+            className="text-xs border border-gray-200 rounded-lg px-2 py-2 outline-none focus:border-red-400 flex-shrink-0"
           >
             {PAGE_SIZE_OPTIONS.map(s => (
               <option key={s} value={s}>{s} / page</option>
@@ -78,8 +78,36 @@ export default function DataTable<T extends Record<string, unknown>>({
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto">
+      {/* Mobile stacked cards */}
+      <div className="md:hidden">
+        {slice.length === 0 ? (
+          <div className="px-4 py-8 text-center text-gray-400 text-sm">No data found</div>
+        ) : (
+          <ul className="divide-y divide-gray-100">
+            {slice.map((row, i) => (
+              <li key={i} className="px-4 py-3.5">
+                <dl className="space-y-1.5">
+                  {columns.map(col => (
+                    <div key={String(col.key)} className="flex items-start justify-between gap-3">
+                      <dt className="text-[11px] uppercase tracking-wide text-gray-400 font-medium shrink-0 pt-0.5">
+                        {col.header}
+                      </dt>
+                      <dd className="text-sm text-gray-700 text-right min-w-0 break-words">
+                        {col.render
+                          ? col.render(row)
+                          : String(row[col.key as keyof T] ?? '—')}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Table (tablet/desktop) */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-left text-sm text-gray-600">
           <thead className="text-xs text-gray-400 uppercase bg-gray-50/60 border-b">
             <tr>
@@ -115,17 +143,18 @@ export default function DataTable<T extends Record<string, unknown>>({
       </div>
 
       {/* Pagination */}
-      <div className="px-4 py-3 border-t flex items-center justify-between text-xs text-gray-500">
-        <span>
+      <div className="px-4 py-3 border-t flex items-center justify-between gap-2 text-xs text-gray-500">
+        <span className="min-w-0 truncate">
           {filtered.length === 0
             ? 'No records'
             : `${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, filtered.length)} of ${filtered.length}`}
         </span>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-shrink-0">
           <button
             onClick={() => setPage(p => Math.max(1, p - 1))}
             disabled={safePage === 1}
-            className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 transition-colors"
+            aria-label="Previous page"
+            className="flex items-center justify-center w-9 h-9 sm:w-8 sm:h-8 rounded hover:bg-gray-100 disabled:opacity-40 transition-colors"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -139,7 +168,7 @@ export default function DataTable<T extends Record<string, unknown>>({
               <button
                 key={pageNum}
                 onClick={() => setPage(pageNum)}
-                className={`w-7 h-7 rounded text-xs font-medium transition-colors ${
+                className={`w-9 h-9 sm:w-8 sm:h-8 rounded text-xs font-medium transition-colors ${
                   pageNum === safePage
                     ? 'bg-red-500 text-white'
                     : 'hover:bg-gray-100'
@@ -152,7 +181,8 @@ export default function DataTable<T extends Record<string, unknown>>({
           <button
             onClick={() => setPage(p => Math.min(totalPages, p + 1))}
             disabled={safePage === totalPages}
-            className="p-1 rounded hover:bg-gray-100 disabled:opacity-40 transition-colors"
+            aria-label="Next page"
+            className="flex items-center justify-center w-9 h-9 sm:w-8 sm:h-8 rounded hover:bg-gray-100 disabled:opacity-40 transition-colors"
           >
             <ChevronRight className="w-4 h-4" />
           </button>

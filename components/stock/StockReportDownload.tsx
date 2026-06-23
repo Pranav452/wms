@@ -70,13 +70,13 @@ export default function StockReportDownload() {
         </div>
 
         <div className="flex items-center gap-2 sm:ml-auto flex-wrap">
-          <label className="text-xs text-gray-500 font-medium">As on date</label>
+          <label className="text-xs text-gray-500 font-medium w-full sm:w-auto">As on date</label>
           <input
             type="date"
             value={date}
             max={todayValue()}
             onChange={e => setDate(e.target.value)}
-            className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-red-400"
+            className="text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-red-400 flex-1 sm:flex-none min-w-0"
           />
 
           {REPORTS.map(r => (
@@ -85,7 +85,7 @@ export default function StockReportDownload() {
               onClick={() => download(r.type)}
               title={r.desc}
               disabled={loading !== null}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                 loading === r.type
                   ? 'bg-red-100 text-red-400 cursor-not-allowed'
                   : loading !== null

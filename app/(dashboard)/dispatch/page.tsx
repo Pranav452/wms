@@ -94,9 +94,9 @@ export default function DispatchPage() {
                   const max = data.clientDispatch.reduce((m, x) => Math.max(m, x.DISPATCH_QTY), 0)
                   return (
                     <div key={c.CLIENT}>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="font-medium text-gray-800 truncate max-w-[160px]">{c.CLIENT || '(unknown)'}</span>
-                        <span className="text-gray-500 ml-2">{formatNumber(c.DISPATCH_QTY)} · {c.GIN_COUNT} GINs</span>
+                      <div className="flex justify-between gap-2 text-xs mb-1">
+                        <span className="font-medium text-gray-800 truncate min-w-0">{c.CLIENT || '(unknown)'}</span>
+                        <span className="text-gray-500 shrink-0 text-right">{formatNumber(c.DISPATCH_QTY)} · {c.GIN_COUNT} GINs</span>
                       </div>
                       <div className="w-full bg-gray-100 rounded-full h-1.5">
                         <div className="bg-red-500 h-1.5 rounded-full" style={{ width: `${max ? (c.DISPATCH_QTY / max) * 100 : 0}%` }} />
@@ -136,7 +136,40 @@ export default function DispatchPage() {
           <div className="p-4 border-b">
             <h3 className="font-semibold text-sm text-gray-900">PO vs Dispatch by Client</h3>
           </div>
-          <div className="overflow-x-auto">
+
+          {/* Mobile stacked cards */}
+          <div className="md:hidden">
+            {data.poVsDispatch.length === 0 ? (
+              <div className="px-4 py-6 text-center text-gray-400 text-xs">No data</div>
+            ) : (
+              <ul className="divide-y divide-gray-100">
+                {data.poVsDispatch.map(r => (
+                  <li key={r.CLIENT} className="px-4 py-3.5">
+                    <p className="font-medium text-gray-900 text-sm mb-2 break-words">{r.CLIENT || '—'}</p>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-gray-400">PO Qty</p>
+                        <p className="text-sm text-gray-700">{formatNumber(r.PO_QTY)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-gray-400">Dispatched</p>
+                        <p className="text-sm text-gray-700">{formatNumber(r.DISPATCHED_QTY)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-gray-400">Balance</p>
+                        <p className={`text-sm font-medium ${r.BALANCE_QTY > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                          {formatNumber(r.BALANCE_QTY)}
+                        </p>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Table (tablet/desktop) */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-sm text-gray-600">
               <thead className="text-xs text-gray-400 uppercase bg-gray-50/60 border-b">
                 <tr>

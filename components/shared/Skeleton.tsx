@@ -35,13 +35,13 @@ export function TableSkeleton({ rows = 8 }: { rows?: number }) {
       </div>
       <div className="divide-y divide-gray-50">
         {Array.from({ length: rows }).map((_, i) => (
-          <div key={i} className="px-4 py-3 flex gap-6">
+          <div key={i} className="px-4 py-3 flex gap-3 sm:gap-6">
             <Skeleton className="h-3 w-8" />
             <Skeleton className="h-3 flex-1" />
             <Skeleton className="h-3 w-16" />
-            <Skeleton className="h-3 w-16" />
-            <Skeleton className="h-3 w-16" />
-            <Skeleton className="h-3 w-16" />
+            <Skeleton className="h-3 w-16 hidden sm:block" />
+            <Skeleton className="h-3 w-16 hidden sm:block" />
+            <Skeleton className="h-3 w-16 hidden sm:block" />
           </div>
         ))}
       </div>
@@ -81,7 +81,9 @@ export function OverviewSkeleton() {
             {[1, 2].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
           </div>
         </div>
-        <ChartCardSkeleton height={200} />
+        <div className="col-span-12 sm:col-span-5">
+          <ChartCardSkeleton height={200} />
+        </div>
         <div className="col-span-12 sm:col-span-4 bg-white rounded-2xl p-4 shadow-sm">
           <Skeleton className="h-4 w-24 mb-3" />
           <Skeleton className="h-36 w-full rounded-xl" />

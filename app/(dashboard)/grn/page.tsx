@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from 'react'
+import React, { useState } from 'react'
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts'
@@ -76,7 +76,7 @@ export default function GRNPage() {
         {/* Daily GRN — interactive area chart */}
         {grnDailyData.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-gray-50">
               <div>
                 <h3 className="font-semibold text-sm text-gray-900">Daily GRN Units Received</h3>
                 <p className="text-xs text-gray-400 mt-0.5">{filteredGRN.length} days shown · {formatNumber(filteredGRN.reduce((s,r)=>s+r.UNITS_IN,0))} units</p>
@@ -86,7 +86,7 @@ export default function GRNPage() {
                   <button
                     key={r.value}
                     onClick={() => setGrnRange(r.value)}
-                    className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
                       grnRange === r.value ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                     }`}
                   >

@@ -77,7 +77,7 @@ export default function StockPage() {
             <button
               key={b}
               onClick={() => setAgingFilter(b)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+              className={`px-3.5 py-2 rounded-full text-xs font-medium transition-colors ${
                 agingFilter === b ? 'bg-red-500 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-red-300'
               }`}
             >
@@ -97,7 +97,7 @@ export default function StockPage() {
               value={eanFilter}
               onChange={e => setEanFilter(e.target.value)}
               placeholder="Filter by EAN…"
-              className="pl-3 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg outline-none focus:border-red-400 w-44"
+              className="pl-3 pr-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-red-400 w-full sm:w-44"
             />
           }
         />

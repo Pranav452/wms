@@ -1,7 +1,8 @@
 "use client";
 
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, Menu } from 'lucide-react'
 import { useDashboard } from '@/context/DashboardContext'
+import { useSidebar } from './SidebarContext'
 
 function formatDisplayDate(ymd: string): string {
   if (!ymd) return ''
@@ -17,17 +18,29 @@ interface HeaderProps {
 
 export default function Header({ title, breadcrumb }: HeaderProps) {
   const { asOnDate, setAsOnDate, refresh, loading } = useDashboard()
+  const { openSidebar } = useSidebar()
 
   return (
-    <header className="flex justify-between items-center mb-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-        <p className="text-xs text-gray-500 mt-0.5">
-          Dashboard / <span className="text-red-500">{breadcrumb}</span>
-        </p>
+    <header className="flex flex-wrap items-center justify-between gap-3 mb-6">
+      <div className="flex items-center gap-3 min-w-0">
+        {/* Mobile hamburger */}
+        <button
+          onClick={openSidebar}
+          aria-label="Open menu"
+          className="lg:hidden flex items-center justify-center w-11 h-11 rounded-xl bg-white shadow-sm border border-gray-100 text-gray-600 hover:text-red-500 transition-colors flex-shrink-0"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{title}</h1>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Dashboard / <span className="text-red-500">{breadcrumb}</span>
+          </p>
+        </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
         {/* As-on-date picker */}
         <div className="flex items-center gap-2 bg-white rounded-xl px-3 py-2 shadow-sm border border-gray-100">
           <span className="text-xs text-gray-500 hidden sm:block">As on:</span>
@@ -35,7 +48,7 @@ export default function Header({ title, breadcrumb }: HeaderProps) {
             type="date"
             value={asOnDate}
             onChange={e => setAsOnDate(e.target.value)}
-            className="text-sm text-gray-800 outline-none bg-transparent cursor-pointer"
+            className="text-sm text-gray-800 outline-none bg-transparent cursor-pointer min-w-0 w-[7.5rem] sm:w-auto"
           />
         </div>
 
@@ -43,7 +56,8 @@ export default function Header({ title, breadcrumb }: HeaderProps) {
         <button
           onClick={refresh}
           disabled={loading}
-          className="flex items-center gap-1.5 bg-white rounded-xl px-3 py-2 shadow-sm border border-gray-100 text-sm text-gray-600 hover:text-red-500 hover:border-red-200 transition-colors disabled:opacity-50"
+          aria-label="Refresh data"
+          className="flex items-center justify-center gap-1.5 bg-white rounded-xl px-3 h-11 sm:h-auto sm:py-2 shadow-sm border border-gray-100 text-sm text-gray-600 hover:text-red-500 hover:border-red-200 transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-red-500' : ''}`} />
           <span className="hidden sm:block">{loading ? 'Loading…' : 'Refresh'}</span>

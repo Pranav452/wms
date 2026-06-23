@@ -215,9 +215,9 @@ export default function OverviewPage() {
                 const max = clientData.reduce((m, x) => Math.max(m, x.RECEIPT_QTY), 0)
                 return (
                   <div key={c.CLIENT}>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="font-medium text-gray-800 truncate max-w-[260px]">{c.CLIENT}</span>
-                      <span className="text-gray-500 ml-2 shrink-0">{formatNumber(c.RECEIPT_QTY)} units · {c.PONO_COUNT} POs · {c.SKU_COUNT} SKUs</span>
+                    <div className="flex justify-between gap-2 text-xs mb-1">
+                      <span className="font-medium text-gray-800 truncate min-w-0 flex-1">{c.CLIENT}</span>
+                      <span className="text-gray-500 shrink-0 text-right">{formatNumber(c.RECEIPT_QTY)} units · {c.PONO_COUNT} POs · {c.SKU_COUNT} SKUs</span>
                     </div>
                     <div className="w-full bg-gray-100 rounded-full h-2">
                       <div
@@ -353,14 +353,14 @@ export default function OverviewPage() {
                 const maxVal = poValueData[0].TOTAL_MRP_VALUE
                 const pct = maxVal ? (v.TOTAL_MRP_VALUE / maxVal) * 100 : 0
                 return (
-                  <div key={v.ARTICLETYPE} className="flex items-center gap-3">
-                    <span className="text-xs font-medium text-gray-700 w-20 shrink-0 truncate">{v.ARTICLETYPE || '(none)'}</span>
-                    <div className="flex-1 bg-gray-100 rounded-full h-2">
+                  <div key={v.ARTICLETYPE} className="flex items-center gap-2 sm:gap-3">
+                    <span className="text-xs font-medium text-gray-700 w-16 sm:w-20 shrink-0 truncate">{v.ARTICLETYPE || '(none)'}</span>
+                    <div className="flex-1 min-w-[2rem] bg-gray-100 rounded-full h-2">
                       <div className="h-2 rounded-full bg-red-500" style={{ width: `${pct}%` }} />
                     </div>
-                    <div className="text-right shrink-0 w-36">
+                    <div className="text-right shrink-0 w-20 sm:w-36">
                       <span className="text-xs font-semibold text-gray-900">₹{formatNumber(Math.round(v.TOTAL_MRP_VALUE / 1000))}K</span>
-                      <span className="text-xs text-gray-400 ml-1.5">avg ₹{formatNumber(Math.round(v.AVG_MRP))}</span>
+                      <span className="hidden sm:inline text-xs text-gray-400 ml-1.5">avg ₹{formatNumber(Math.round(v.AVG_MRP))}</span>
                     </div>
                   </div>
                 )

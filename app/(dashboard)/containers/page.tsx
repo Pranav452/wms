@@ -78,7 +78,7 @@ export default function ContainersPage() {
             <button
               key={t}
               onClick={() => setTypeFilter(t)}
-              className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              className={`px-4 py-2 rounded-full text-xs font-medium transition-colors ${
                 typeFilter === t ? 'bg-red-500 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-red-300'
               }`}
             >
