@@ -9,7 +9,7 @@ import DataTable, { Column } from '@/components/shared/DataTable'
 import { ErrorState } from '@/components/shared/LoadingState'
 import { MRPSkeleton } from '@/components/shared/Skeleton'
 import { useDashboard } from '@/context/DashboardContext'
-import { formatNumber } from '@/lib/utils'
+import { formatNumber, bySPDate } from '@/lib/utils'
 import type { RS5_MrpPending, RS16_MrpPendingContainer } from '@/types/dashboard'
 
 const pendingColumns: Column<RS5_MrpPending>[] = [
@@ -47,7 +47,7 @@ export default function MrpPage() {
   const total = lb ? lb.FP + lb.PENDING + lb.INPROCESS : 0
   const donePct = total ? Math.round((lb!.FP / total) * 100) : 0
 
-  const mrpChartData = [...data.mrpDaily].sort((a, b) => a.COMPLETED_DATE.localeCompare(b.COMPLETED_DATE))
+  const mrpChartData = [...data.mrpDaily].sort((a, b) => bySPDate(a.COMPLETED_DATE, b.COMPLETED_DATE))
 
   return (
     <>
@@ -119,7 +119,13 @@ export default function MrpPage() {
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={mrpChartData} barSize={20}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                <XAxis dataKey="COMPLETED_DATE" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                <XAxis
+                  dataKey="COMPLETED_DATE" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd"
+                  tickFormatter={v => {
+                    const d = new Date(v.split('/').reverse().join('-'))
+                    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                  }}
+                />
                 <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} width={55} tickFormatter={v => formatNumber(v)} />
                 <Tooltip
                   formatter={(v: unknown) => [formatNumber(v as number), 'Units Labelled']}

@@ -9,7 +9,7 @@ import Header from '@/components/layout/Header'
 import { ErrorState } from '@/components/shared/LoadingState'
 import { DispatchSkeleton } from '@/components/shared/Skeleton'
 import { useDashboard } from '@/context/DashboardContext'
-import { formatNumber } from '@/lib/utils'
+import { formatNumber, bySPDate } from '@/lib/utils'
 
 export default function DispatchPage() {
   const { data, loading, error } = useDashboard()
@@ -18,9 +18,10 @@ export default function DispatchPage() {
   if (error)   return <><Header title="Dispatch" breadcrumb="Dispatch" /><ErrorState message={error} /></>
   if (!data)   return null
 
-  const lastDate    = data.dailyDispatch.at(-1)?.PROCESS_DATE ?? ''
-  const totalDisp   = data.dailyDispatch.reduce((s, r) => s + r.DISPATCH_QTY, 0)
-  const maxDayDisp  = data.dailyDispatch.reduce((m, r) => Math.max(m, r.DISPATCH_QTY), 0)
+  const dailyDispatch = [...data.dailyDispatch].sort((a, b) => bySPDate(a.PROCESS_DATE, b.PROCESS_DATE))
+  const lastDate    = dailyDispatch.at(-1)?.PROCESS_DATE ?? ''
+  const totalDisp   = dailyDispatch.reduce((s, r) => s + r.DISPATCH_QTY, 0)
+  const maxDayDisp  = dailyDispatch.reduce((m, r) => Math.max(m, r.DISPATCH_QTY), 0)
 
   // Normalise delivery agents (TRISPEED / TRI SPEED → TRI SPEED)
   const agentData = data.deliveryAgents.slice(0, 8)
@@ -52,9 +53,9 @@ export default function DispatchPage() {
             <h3 className="font-semibold text-sm text-gray-900">Daily Dispatch Trend</h3>
             {lastDate && <span className="text-xs text-gray-400">Latest: {lastDate}</span>}
           </div>
-          {data.dailyDispatch.length > 0 ? (
+          {dailyDispatch.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={data.dailyDispatch}>
+              <AreaChart data={dailyDispatch}>
                 <defs>
                   <linearGradient id="dispatchGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%"  stopColor="#ef4444" stopOpacity={0.15} />
@@ -62,7 +63,13 @@ export default function DispatchPage() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                <XAxis dataKey="PROCESS_DATE" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                <XAxis
+                  dataKey="PROCESS_DATE" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd"
+                  tickFormatter={v => {
+                    const d = new Date(v.split('/').reverse().join('-'))
+                    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                  }}
+                />
                 <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} width={50} tickFormatter={v => formatNumber(v)} />
                 <Tooltip
                   formatter={(v: unknown) => [formatNumber(v as number), 'Dispatch Qty']}

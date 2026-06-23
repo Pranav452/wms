@@ -8,7 +8,7 @@ import Header from '@/components/layout/Header'
 import { ErrorState } from '@/components/shared/LoadingState'
 import { GRNSkeleton } from '@/components/shared/Skeleton'
 import { useDashboard } from '@/context/DashboardContext'
-import { formatNumber, formatMonthKey } from '@/lib/utils'
+import { formatNumber, formatMonthKey, bySPDate, lastNDays } from '@/lib/utils'
 
 const RANGES = [
   { label: 'Last 7 days',    value: '7d',  days: 7 },
@@ -39,17 +39,18 @@ export default function GRNPage() {
   const peakMonth    = monthlyData.reduce((p, c) => c.RECEIPT_QTY > (p?.RECEIPT_QTY ?? 0) ? c : p, monthlyData[0])
   const avgMonthly   = monthlyData.length ? Math.round(totalReceipt / monthlyData.length) : 0
 
-  const grnDailyData = [...data.grnDaily].sort((a, b) => a.GRN_DATE.localeCompare(b.GRN_DATE))
-  const totalUnitsIn = grnDailyData.reduce((s, r) => s + (r.UNITS_IN ?? 0), 0)
+  const grnDailyData = [...data.grnDaily].sort((a, b) => bySPDate(a.GRN_DATE, b.GRN_DATE))
+  const grn60d       = lastNDays(grnDailyData, 'GRN_DATE', 60, data.asOnDate)
+  const totalUnitsIn = grn60d.reduce((s, r) => s + (r.UNITS_IN ?? 0), 0)
 
-  // filter GRN daily by range
+  // filter GRN daily by date window, anchored at the As-on date
   const grnDays = RANGES.find(r => r.value === grnRange)?.days ?? 60
-  const filteredGRN = grnDailyData.slice(-grnDays)
+  const filteredGRN = lastNDays(grnDailyData, 'GRN_DATE', grnDays, data.asOnDate)
 
-  // filter dispatch by range
-  const allDispatch = [...data.dailyDispatch].sort((a, b) => a.PROCESS_DATE.localeCompare(b.PROCESS_DATE))
+  // filter dispatch by date window, anchored at the As-on date
+  const allDispatch = [...data.dailyDispatch].sort((a, b) => bySPDate(a.PROCESS_DATE, b.PROCESS_DATE))
   const dispDays = DISPATCH_RANGES.find(r => r.label === dispRange)?.days ?? 30
-  const filteredDisp = allDispatch.slice(-dispDays)
+  const filteredDisp = lastNDays(allDispatch, 'PROCESS_DATE', dispDays, data.asOnDate)
 
   return (
     <>
@@ -62,7 +63,7 @@ export default function GRNPage() {
             { label: 'Receipts (12m)',  value: formatNumber(totalReceipt), sub: 'units received' },
             { label: 'Peak Month',      value: peakMonth?.label ?? '—',    sub: formatNumber(peakMonth?.RECEIPT_QTY ?? 0) + ' units' },
             { label: 'Avg Monthly',     value: formatNumber(avgMonthly),   sub: 'units/month' },
-            { label: 'Units In (60d)',  value: formatNumber(totalUnitsIn), sub: `${grnDailyData.length} active days` },
+            { label: 'Units In (60d)',  value: formatNumber(totalUnitsIn), sub: `${grn60d.length} active days` },
           ].map(c => (
             <div key={c.label} className="bg-white rounded-2xl p-4 shadow-sm">
               <p className="text-xs text-gray-500 mb-1">{c.label}</p>
@@ -95,6 +96,9 @@ export default function GRNPage() {
               </div>
             </div>
             <div className="px-5 pb-5 pt-4">
+              {filteredGRN.length === 0 ? (
+                <p className="text-xs text-gray-400 py-12 text-center">No GRN activity in this window</p>
+              ) : (
               <ResponsiveContainer width="100%" height={220}>
                 <AreaChart data={filteredGRN}>
                   <defs>
@@ -126,6 +130,7 @@ export default function GRNPage() {
                     fill="url(#grnGrad)" dot={false} activeDot={{ r: 4, fill: '#ef4444', strokeWidth: 0 }} />
                 </AreaChart>
               </ResponsiveContainer>
+              )}
             </div>
           </div>
         )}
@@ -197,10 +202,20 @@ export default function GRNPage() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                  <XAxis dataKey="PROCESS_DATE" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                  <XAxis
+                    dataKey="PROCESS_DATE" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd"
+                    tickFormatter={v => {
+                      const d = new Date(v.split('/').reverse().join('-'))
+                      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    }}
+                  />
                   <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} width={55} tickFormatter={v => formatNumber(v)} />
                   <Tooltip
                     cursor={{ stroke: '#1e1e1e', strokeWidth: 1, strokeDasharray: '4 2' }}
+                    labelFormatter={l => {
+                      const d = new Date(l.split('/').reverse().join('-'))
+                      return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                    }}
                     contentStyle={{ fontSize: 11, borderRadius: 10, border: '1px solid #e5e7eb', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
                     formatter={(v: unknown) => [formatNumber(v as number), 'Dispatch Qty']}
                   />
