@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Seaport WMS",
-  description: "Warehouse Management System — Seaport Logistics Mumbai",
+  title: "Bridge WMS",
+  description: "Warehouse Management System — Bridge WMS",
 };
 
 export const viewport: Viewport = {

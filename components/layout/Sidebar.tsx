@@ -62,7 +62,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
                 <div className="w-3 h-3 bg-white rounded-sm transform -rotate-45" />
               </div>
               <Warehouse className="w-5 h-5 text-red-500 flex-shrink-0" />
-              <span className="truncate">Seaport WMS</span>
+              <span className="truncate">Bridge WMS</span>
             </div>
             <button
               onClick={onClose}
@@ -76,11 +76,11 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           {/* User stub */}
           <div className="flex items-center gap-3 bg-gray-50 p-2 rounded-xl mb-8 border border-gray-100">
             <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-sm flex-shrink-0">
-              SL
+              BW
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-gray-900 truncate">Seaport Logistics</p>
-              <p className="text-xs text-gray-500">Mumbai · Admin</p>
+              <p className="text-sm font-semibold text-gray-900 truncate">Bridge WMS</p>
+              <p className="text-xs text-gray-500">Admin</p>
             </div>
           </div>
 
@@ -122,8 +122,8 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           {/* Info card */}
           <div className="bg-[#1e1e1e] rounded-2xl p-4 text-white mt-4 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-20 h-20 bg-red-500/20 rounded-full blur-2xl -mr-8 -mt-8" />
-            <h3 className="font-bold text-sm mb-1 relative z-10 leading-tight">Seaport Logistics<br />Mumbai</h3>
-            <p className="text-xs text-gray-400 relative z-10">WMS Stock-Status Dashboard</p>
+            <h3 className="font-bold text-sm mb-1 relative z-10 leading-tight">Bridge WMS</h3>
+            <p className="text-xs text-gray-400 relative z-10">Stock-Status Dashboard</p>
           </div>
         </div>
       </aside>
