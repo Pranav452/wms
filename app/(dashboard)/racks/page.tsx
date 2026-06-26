@@ -97,38 +97,62 @@ function RackRow({ rack, metric, active, onClick }: { rack: Rack; metric: Metric
   )
 }
 
-// ── focused rack grid (big, readable, always fits) ───────────────────────────
+// ── focused rack grid — each shelf = a boxed pair of 2 bins ───────────────────
 function FocusedGrid({ rack, onPick, selectedCode }: { rack: Rack; onPick: (i: LocationInfo) => void; selectedCode: string | null }) {
   const levels = Array.from({ length: rack.levels }, (_, i) => rack.levels - i) // high → 1
-  const cols = Array.from({ length: rack.cols }, (_, i) => i)
+  const bays = Array.from({ length: rack.bays }, (_, i) => i + 1)
+  const sides = Array.from({ length: POSITIONS_PER_SHELF }, (_, s) => s)
+
   return (
-    <div className="overflow-x-auto">
-      <div className="grid gap-1.5 min-w-[480px]" style={{ gridTemplateColumns: `2rem repeat(${rack.cols}, minmax(2.75rem, 1fr))` }}>
-        <div />
-        {cols.map(c => (
-          <div key={c} className="text-center text-[10px] font-mono text-gray-400 pb-0.5">{colLetter(c)}</div>
-        ))}
+    <div className="overflow-x-auto pb-1">
+      <div className="inline-flex flex-col gap-1.5">
+        {/* header: per-shelf bay label + bin position letters */}
+        <div className="flex items-end gap-2.5">
+          <div className="w-7 flex-shrink-0" />
+          {bays.map(bay => (
+            <div key={bay} className="flex flex-col items-center gap-0.5">
+              <span className="text-[9px] font-mono text-gray-400">Shelf {bay}</span>
+              <div className="flex gap-0.5">
+                {sides.map(s => (
+                  <span key={s} className="w-11 text-center text-[8px] font-mono text-gray-300">
+                    {colLetter((bay - 1) * POSITIONS_PER_SHELF + s)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* level rows */}
         {levels.map(level => (
-          <React.Fragment key={level}>
-            <div className="flex items-center justify-end pr-1 text-[10px] font-mono text-gray-400">{String(level).padStart(2, '0')}</div>
-            {cols.map(col => {
-              const code = locationCode(rack.name, level, col)
-              const bk = bucketOf(slotStat(code).pct)
-              const active = selectedCode === code
-              return (
-                <button
-                  key={col}
-                  onClick={() => onPick(locationInfo(rack, level, col))}
-                  title={code}
-                  className={`h-9 rounded-lg border flex items-center justify-center text-[11px] font-mono transition-colors ${
-                    active ? 'bg-red-500 text-white border-red-500 ring-2 ring-red-300' : BUCKET_CELL[bk]
-                  }`}
-                >
-                  {code}
-                </button>
-              )
-            })}
-          </React.Fragment>
+          <div key={level} className="flex items-center gap-2.5">
+            <div className="w-7 flex-shrink-0 text-right pr-1 text-[10px] font-mono text-gray-400">
+              {String(level).padStart(2, '0')}
+            </div>
+            {bays.map(bay => (
+              // one shelf = a subtle box holding its 2 bins
+              <div key={bay} className="flex gap-0.5 p-1 rounded-lg bg-gray-50 border border-gray-200/70">
+                {sides.map(s => {
+                  const col = (bay - 1) * POSITIONS_PER_SHELF + s
+                  const code = locationCode(rack.name, level, col)
+                  const bk = bucketOf(slotStat(code).pct)
+                  const active = selectedCode === code
+                  return (
+                    <button
+                      key={col}
+                      onClick={() => onPick(locationInfo(rack, level, col))}
+                      title={code}
+                      className={`w-11 h-9 rounded-md border flex items-center justify-center text-[11px] font-mono transition-colors ${
+                        active ? 'bg-red-500 text-white border-red-500 ring-2 ring-red-300' : BUCKET_CELL[bk]
+                      }`}
+                    >
+                      {code}
+                    </button>
+                  )
+                })}
+              </div>
+            ))}
+          </div>
         ))}
       </div>
     </div>
@@ -144,7 +168,7 @@ function FocusedPanel({ rack, onPick, selectedCode }: { rack: Rack; onPick: (i: 
         <div>
           <h2 className="text-xl font-bold text-gray-900 font-mono">RACK {rack.name}</h2>
           <p className="text-xs text-gray-400">
-            {rack.bays} bays · {rack.levels} levels · {rack.shelves} shelves · {rack.locations} drawers
+            {rack.bays} bays · {rack.levels} levels · {rack.shelves} shelves · {rack.locations} bins
           </p>
         </div>
         <div className="flex gap-2">
@@ -164,7 +188,7 @@ function FocusedPanel({ rack, onPick, selectedCode }: { rack: Rack; onPick: (i: 
           </div>
         ))}
         <div className="flex-1" />
-        <span className="text-[11px] text-gray-400">Each shelf = {POSITIONS_PER_SHELF} drawers. Click a drawer for details.</span>
+        <span className="text-[11px] text-gray-400">Each boxed pair = 1 shelf ({POSITIONS_PER_SHELF} bins). Click a bin for details.</span>
       </div>
     </div>
   )
@@ -188,7 +212,7 @@ function LocationDrawer({ info, onClose }: { info: LocationInfo; onClose: () => 
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div>
             <div className="text-lg font-bold text-gray-900 font-mono">{info.code}</div>
-            <div className="text-xs text-gray-400">{info.floorLabel} · drawer location</div>
+            <div className="text-xs text-gray-400">{info.floorLabel} · bin · {info.side} of shelf</div>
           </div>
           <button onClick={onClose} aria-label="Close" className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-50 hover:text-gray-700 transition-colors">
             <X className="w-5 h-5" />
@@ -214,7 +238,7 @@ function LocationDrawer({ info, onClose }: { info: LocationInfo; onClose: () => 
 
           <div className="flex items-start gap-2 mt-5 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-xs text-gray-500">
             <PackageSearch className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <span>EAN / Ref / Balance are blank until a per-drawer stock feed is wired. Occupancy figures are demo data.</span>
+            <span>EAN / Ref / Balance are blank until a per-bin stock feed is wired. Occupancy figures are demo data.</span>
           </div>
         </div>
       </aside>
