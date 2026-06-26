@@ -105,16 +105,16 @@ function FocusedGrid({ rack, onPick, selectedCode }: { rack: Rack; onPick: (i: L
 
   return (
     <div className="overflow-x-auto pb-1">
-      <div className="inline-flex flex-col gap-1.5">
+      <div className="min-w-[520px] flex flex-col gap-2">
         {/* header: per-shelf bay label + bin position letters */}
         <div className="flex items-end gap-2.5">
           <div className="w-7 flex-shrink-0" />
           {bays.map(bay => (
-            <div key={bay} className="flex flex-col items-center gap-0.5">
+            <div key={bay} className="flex-1 flex flex-col items-center gap-0.5">
               <span className="text-[9px] font-mono text-gray-400">Shelf {bay}</span>
-              <div className="flex gap-0.5">
+              <div className="flex gap-1 w-full px-1">
                 {sides.map(s => (
-                  <span key={s} className="w-11 text-center text-[8px] font-mono text-gray-300">
+                  <span key={s} className="flex-1 text-center text-[8px] font-mono text-gray-300">
                     {colLetter((bay - 1) * POSITIONS_PER_SHELF + s)}
                   </span>
                 ))}
@@ -130,8 +130,8 @@ function FocusedGrid({ rack, onPick, selectedCode }: { rack: Rack; onPick: (i: L
               {String(level).padStart(2, '0')}
             </div>
             {bays.map(bay => (
-              // one shelf = a subtle box holding its 2 bins
-              <div key={bay} className="flex gap-0.5 p-1 rounded-lg bg-gray-50 border border-gray-200/70">
+              // one shelf = a subtle box holding its 2 bins, stretched to fill width
+              <div key={bay} className="flex-1 flex gap-1 p-1 rounded-lg bg-gray-50 border border-gray-200/70">
                 {sides.map(s => {
                   const col = (bay - 1) * POSITIONS_PER_SHELF + s
                   const code = locationCode(rack.name, level, col)
@@ -142,7 +142,7 @@ function FocusedGrid({ rack, onPick, selectedCode }: { rack: Rack; onPick: (i: L
                       key={col}
                       onClick={() => onPick(locationInfo(rack, level, col))}
                       title={code}
-                      className={`w-11 h-9 rounded-md border flex items-center justify-center text-[11px] font-mono transition-colors ${
+                      className={`flex-1 min-w-0 h-10 rounded-md border flex items-center justify-center text-xs font-mono transition-colors ${
                         active ? 'bg-red-500 text-white border-red-500 ring-2 ring-red-300' : BUCKET_CELL[bk]
                       }`}
                     >
