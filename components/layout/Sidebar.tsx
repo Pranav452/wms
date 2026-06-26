@@ -33,14 +33,7 @@ type NavEntry = NavLeaf | NavGroupItem
 const NAV_ITEMS: NavEntry[] = [
   { href: '/overview',   icon: LayoutDashboard, label: 'Overview' },
   { href: '/stock',      icon: Box,             label: 'Stock Detail' },
-  {
-    icon: Boxes,
-    label: 'Warehouse',
-    children: [
-      { href: '/racks/map',    label: 'Warehouse Map' },
-      { href: '/racks/detail', label: 'Rack / Bin Detail' },
-    ],
-  },
+  { href: '/racks',      icon: Boxes,           label: 'Rack Management' },
   { href: '/containers', icon: Ship,       label: 'Containers' },
   { href: '/dispatch',   icon: Truck,      label: 'Dispatch' },
   { href: '/grn',        icon: TrendingUp, label: 'GRN & Trends' },

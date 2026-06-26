@@ -1,128 +1,60 @@
 // Single source of truth for the physical warehouse rack layout.
 //
-// Source: "RACK DETAILS .xls" (2026) + the hand-drawn location-code sketch.
-// The warehouse has TWO floors, each with its OWN rack set:
+// Source: current warehouse spec (2026). This SUPERSEDES the discarded A–P
+// scheme from the 2024 KIABI email — same building, re-counted.
 //
-//   First Floor  — 16 racks (A–P)   →  832 shelves / 1664 locations
-//   Ground Floor — 14 racks (GA–GN) → 1188 shelves / 2376 locations
-//   ──────────────────────────────────────────────────────────────
-//   Warehouse total                 → 2020 shelves / 4040 locations
+//   14 racks. Each shelf holds 2 storage locations — one per floor
+//   (Ground + Level 1), which is why locations = 2 × shelves.
+//     • 12 racks      → 88 shelves / 176 locations
+//     • Racks 2 & 9   → 66 shelves / 132 locations
+//   Totals: 1188 shelves · 2376 locations.
 //
-// Every shelf = 2 side-by-side storage positions, so the addressable unit is
-// the LOCATION (= 2 × shelves). The grid renders one cell per location:
-// columns = bays × 2, rows = levels.
-//
-// Geometry (bays × levels) is derived from the per-rack shelf counts and the
-// 2024 KIABI email; it factors exactly. 11 levels everywhere except Rack I
-// (8 levels). Confirm if any rack's real shape differs — only the
-// [name, bays, levels] rows below need editing.
+// GEOMETRY ASSUMPTION (confirm with warehouse): each rack is 11 shelves tall
+// (levels 1–11, ground = level 1 at the bottom). Bays (columns) are then
+// shelves ÷ 11 → 8 bays for an 88-shelf rack, 6 bays for a 66-shelf rack.
+// If the real shape differs, change LEVELS_PER_BAY / SMALL_RACKS below only.
 
-export type FloorId = 'first' | 'ground'
+export const FLOORS = [
+  { id: 'G',  label: 'Ground',  locations: 0 }, // locations filled in below
+  { id: 'L1', label: 'Level 1', locations: 0 },
+] as const
+export type FloorId = (typeof FLOORS)[number]['id']
 
-export interface Floor {
-  id: FloorId
-  label: string
-  short: string
-}
-
-export const FLOORS: Floor[] = [
-  { id: 'first',  label: 'First Floor',  short: '1F' },
-  { id: 'ground', label: 'Ground Floor', short: 'GF' },
-]
-
-export const POSITIONS_PER_SHELF = 2 // 2 side-by-side positions per shelf
+export const LEVELS_PER_BAY = 11 // shelf heights, bottom (1) → top (11)
 
 export interface Rack {
-  name: string     // 'A', 'GA', …
-  floor: FloorId
-  bays: number     // physical bays (shelf columns)
-  levels: number   // rows, 1 (bottom) → levels (top)
-  shelves: number  // bays × levels
-  cols: number     // grid columns = bays × 2 (one per position)
-  locations: number
+  no: number      // 1..14
+  shelves: number // physical shelf positions
+  bays: number    // columns (shelves / LEVELS_PER_BAY)
 }
 
-// [name, bays, levels] — order preserved for display.
-const FIRST_FLOOR: [string, number, number][] = [
-  ['A', 5, 11], ['B', 5, 11], ['C', 5, 11], ['D', 5, 11],
-  ['E', 4, 11], ['F', 4, 11], ['G', 5, 11], ['H', 5, 11],
-  ['I', 5,  8], ['J', 5, 11], ['K', 4, 11], ['L', 5, 11],
-  ['M', 5, 11], ['N', 5, 11], ['O', 5, 11], ['P', 5, 11],
-]
+// Racks with a reduced footprint (66 shelves instead of 88).
+const SMALL_RACKS = new Set<number>([2, 9])
 
-const GROUND_FLOOR: [string, number, number][] = [
-  ['GA', 8, 11], ['GB', 6, 11], ['GC', 8, 11], ['GD', 8, 11],
-  ['GE', 8, 11], ['GF', 8, 11], ['GG', 8, 11], ['GH', 8, 11],
-  ['GI', 6, 11], ['GJ', 8, 11], ['GK', 8, 11], ['GL', 8, 11],
-  ['GM', 8, 11], ['GN', 8, 11],
-]
+export const RACKS: Rack[] = Array.from({ length: 14 }, (_, i) => {
+  const no = i + 1
+  const shelves = SMALL_RACKS.has(no) ? 66 : 88
+  return { no, shelves, bays: shelves / LEVELS_PER_BAY }
+})
 
-function build(rows: [string, number, number][], floor: FloorId): Rack[] {
-  return rows.map(([name, bays, levels]) => {
-    const shelves = bays * levels
-    const cols = bays * POSITIONS_PER_SHELF
-    return { name, floor, bays, levels, shelves, cols, locations: shelves * POSITIONS_PER_SHELF }
-  })
+export const TOTAL_SHELVES = RACKS.reduce((s, r) => s + r.shelves, 0)   // 1188
+export const LOCATIONS_PER_SHELF = FLOORS.length                        // 2
+export const TOTAL_LOCATIONS = TOTAL_SHELVES * LOCATIONS_PER_SHELF      // 2376
+export const LOCATIONS_PER_FLOOR = TOTAL_SHELVES                        // 1188
+
+// A location's address, e.g. locationId('G', 7, 3, 9) → "G-07-3-09"
+//   Floor · Rack · Bay · Shelf-height. Read left→right exactly how you walk:
+//   floor → rack → bay → shelf.
+export function locationId(floor: FloorId, rack: number, bay: number, level: number): string {
+  return `${floor}-${String(rack).padStart(2, '0')}-${bay}-${String(level).padStart(2, '0')}`
 }
 
-export const RACKS: Rack[] = [...build(FIRST_FLOOR, 'first'), ...build(GROUND_FLOOR, 'ground')]
-
-export function racksOnFloor(floor: FloorId): Rack[] {
-  return RACKS.filter(r => r.floor === floor)
+// Human-readable form of the same address.
+export function locationLabel(floor: FloorId, rack: number, bay: number, level: number): string {
+  const f = FLOORS.find(x => x.id === floor)!.label
+  return `${f} · Rack ${String(rack).padStart(2, '0')} · Bay ${bay} · Shelf ${String(level).padStart(2, '0')}`
 }
 
-export interface FloorTotals {
-  racks: number
-  shelves: number
-  locations: number
-}
-
-export function floorTotals(floor: FloorId): FloorTotals {
-  const rs = racksOnFloor(floor)
-  const shelves = rs.reduce((s, r) => s + r.shelves, 0)
-  return { racks: rs.length, shelves, locations: shelves * POSITIONS_PER_SHELF }
-}
-
-const _all = RACKS.reduce((s, r) => s + r.shelves, 0)
-export const TOTAL_SHELVES = _all                                 // 2020
-export const TOTAL_LOCATIONS = _all * POSITIONS_PER_SHELF         // 4040
-
-// Column index (0-based) → letter: 0 → 'A', 1 → 'B'…  (positions run A, B, C…)
-export function colLetter(i: number): string {
-  return String.fromCharCode(65 + i)
-}
-
-// Location code, per the hand-drawn sketch: <Rack><Level2><Position>
-//   locationCode('A', 2, 3) → "A02D"  (Rack A, Level 02, position D)
-export function locationCode(rack: string, level: number, col: number): string {
-  return `${rack}${String(level).padStart(2, '0')}${colLetter(col)}`
-}
-
-// Structured detail for the side drawer.
-export interface LocationInfo {
-  code: string
-  floor: FloorId
-  floorLabel: string
-  rack: string
-  level: number
-  position: string // A, B, C…
-  bay: number      // physical bay (1-based)
-  side: 'Left' | 'Right'
-}
-
-export function locationInfo(rack: Rack, level: number, col: number): LocationInfo {
-  return {
-    code: locationCode(rack.name, level, col),
-    floor: rack.floor,
-    floorLabel: FLOORS.find(f => f.id === rack.floor)!.label,
-    rack: rack.name,
-    level,
-    position: colLetter(col),
-    bay: Math.floor(col / POSITIONS_PER_SHELF) + 1,
-    side: col % POSITIONS_PER_SHELF === 0 ? 'Left' : 'Right',
-  }
-}
-
-// Occupancy status. v1 has no per-location feed, so everything reads 'empty';
-// the palette is ready for when a live source exists.
+// Occupancy status of a location. v1 has no data source, so everything reads
+// 'empty'; the palette is kept ready for when a per-location feed exists.
 export type SlotStatus = 'full' | 'partial' | 'empty' | 'blocked'
