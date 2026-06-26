@@ -84,20 +84,15 @@ function RackRow({ rack, metric, active, onClick }: { rack: Rack; metric: Metric
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-3 sm:gap-4 px-3 py-2.5 rounded-xl border transition-all ${
+      className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg border transition-all ${
         active ? 'border-red-400 bg-red-50/40 ring-1 ring-red-300' : 'border-gray-100 bg-white hover:border-gray-300'
       }`}
     >
-      <span className="font-mono font-bold text-sm text-gray-800 w-10 text-left flex-shrink-0">{rack.name}</span>
-      <div className="flex-1 min-w-0">
-        <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
-          <div className={`h-full rounded-full ${BUCKET_BAR[bk]}`} style={{ width: `${s.pct}%` }} />
-        </div>
+      <span className="font-mono font-bold text-xs text-gray-800 w-5 text-left flex-shrink-0">{rack.name}</span>
+      <div className="flex-1 min-w-0 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+        <div className={`h-full rounded-full ${BUCKET_BAR[bk]}`} style={{ width: `${s.pct}%` }} />
       </div>
-      <span className="text-xs font-semibold text-gray-700 tabular-nums w-20 text-right flex-shrink-0">{metricValue(rack, metric)}</span>
-      <span className="hidden sm:block text-[11px] text-gray-400 tabular-nums w-24 text-right flex-shrink-0">
-        {rack.bays}×{rack.levels} · {rack.locations} loc
-      </span>
+      <span className="text-[10px] font-semibold text-gray-600 tabular-nums w-12 text-right flex-shrink-0">{metricValue(rack, metric)}</span>
     </button>
   )
 }
@@ -300,32 +295,26 @@ export default function RacksPage() {
         <StatTile icon={AlertTriangle} label="Racks near full" value={String(roll.nearFull)} sub=">85% occupancy" />
       </div>
 
-      {/* Body — list: stacked rows above focused rack · grid: side rail + focused rack */}
-      {view === 'list' ? (
-        <div className="flex flex-col gap-4">
-          <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-3">
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2 px-1">Racks ({racks.length})</p>
+      {/* Body — side rail (rack picker, list or grid) + focused rack */}
+      <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-4 items-start">
+        <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-3">
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2 px-1">Racks ({racks.length})</p>
+          {view === 'list' ? (
             <div className="flex flex-col gap-1.5">
               {racks.map(r => (
                 <RackRow key={r.name} rack={r} metric={metric} active={r.name === active.name} onClick={() => setSelectedRack(r.name)} />
               ))}
             </div>
-          </div>
-          <FocusedPanel rack={active} onPick={setSelected} selectedCode={selected?.code ?? null} />
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-4 items-start">
-          <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-3">
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2 px-1">Racks</p>
+          ) : (
             <div className="grid grid-cols-3 lg:grid-cols-2 gap-2">
               {racks.map(r => (
                 <RackTile key={r.name} rack={r} metric={metric} active={r.name === active.name} onClick={() => setSelectedRack(r.name)} />
               ))}
             </div>
-          </div>
-          <FocusedPanel rack={active} onPick={setSelected} selectedCode={selected?.code ?? null} />
+          )}
         </div>
-      )}
+        <FocusedPanel rack={active} onPick={setSelected} selectedCode={selected?.code ?? null} />
+      </div>
 
       {selected && <LocationDrawer info={selected} onClose={() => setSelected(null)} />}
     </>
