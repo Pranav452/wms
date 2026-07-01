@@ -55,48 +55,82 @@ function rawHttpGet(host: string, path: string): Promise<Buffer> {
   })
 }
 
-export async function GET(req: NextRequest) {
-  const sp          = req.nextUrl.searchParams
-  const type        = sp.get('type') ?? 'stock'
-  const asondate    = sp.get('asondate') ?? new Date().toLocaleDateString('en-GB')
-  const cmpcode     = sp.get('cmpcode')  ?? '01'
-  const citycode    = sp.get('citycode') ?? 'MUM'
-  const containerno = sp.get('containerno') ?? 'All'
-
-  const path = PATHS[type]
-  if (!path) return NextResponse.json({ error: 'Unknown report type' }, { status: 400 })
-
-  const qs  = `CONTAINERNO=${encodeURIComponent(containerno)}&CMPCODE=${encodeURIComponent(cmpcode)}&CITYCODE=${encodeURIComponent(citycode)}&ASONDATE=${asondate}`
-  const url = `http://${API_BASE_HOST}${API_BASE_PATH}/${path}?${qs}`
-
+async function callUpstream(path: string, qs: string): Promise<Buffer> {
+  const url      = `http://${API_BASE_HOST}${API_BASE_PATH}/${path}?${qs}`
   const parsed   = new URL(url)
   const fullPath = parsed.pathname + parsed.search
-
   console.log('[reports/download] raw TCP GET', API_BASE_HOST, fullPath)
+  const body = await rawHttpGet(API_BASE_HOST, fullPath)
+  console.log('[reports/download] body bytes:', body.length)
+  return body
+}
+
+// Upstream sends SpreadsheetML 2003 XML mislabeled as .xls — Excel tolerates it,
+// Google Sheets/cloud viewers don't. Its declared encoding="utf-16" is also wrong
+// (bytes are actually plain UTF-8), so fix that before handing it to the parser.
+function xlsToXlsx(body: Buffer): Buffer {
+  const xml = body.toString('utf8').replace(
+    /(<\?xml[^>]*encoding=")utf-16("[^>]*\?>)/i,
+    '$1utf-8$2'
+  )
+  const workbook = XLSX.read(xml, { type: 'string' })
+  return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer
+}
+
+// The upstream report (SQL query + XSLT transform over the full MRP dataset) can take
+// well over a minute — longer than Vercel will hold one request open. So this proxies a
+// start/status/result job pattern instead of one blocking call: START kicks the report off
+// on the .NET side and returns instantly, STATUS is polled until done, RESULT streams the
+// already-finished file. Each of the three calls here is fast on its own.
+export async function GET(req: NextRequest) {
+  const sp     = req.nextUrl.searchParams
+  const action = sp.get('action') ?? 'start'
 
   try {
-    const body = await rawHttpGet(API_BASE_HOST, fullPath)
-    console.log('[reports/download] body bytes:', body.length)
+    if (action === 'start') {
+      const type        = sp.get('type') ?? 'stock'
+      const asondate    = sp.get('asondate') ?? new Date().toLocaleDateString('en-GB')
+      const cmpcode     = sp.get('cmpcode')  ?? '01'
+      const citycode    = sp.get('citycode') ?? 'MUM'
+      const containerno = sp.get('containerno') ?? 'All'
 
-    // Upstream sends SpreadsheetML 2003 XML mislabeled as .xls — Excel tolerates it,
-    // Google Sheets/cloud viewers don't. Its declared encoding="utf-16" is also wrong
-    // (bytes are actually plain UTF-8), so fix that before handing it to the parser.
-    const xml = body.toString('utf8').replace(
-      /(<\?xml[^>]*encoding=")utf-16("[^>]*\?>)/i,
-      '$1utf-8$2'
-    )
-    const workbook = XLSX.read(xml, { type: 'string' })
-    const xlsxBuf  = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer
+      const path = PATHS[type]
+      if (!path) return NextResponse.json({ error: 'Unknown report type' }, { status: 400 })
 
-    const dateSlug = asondate.replace(/\//g, '-')
-    const filename = `${type}-report-${dateSlug}.xlsx`
+      const qs   = `CONTAINERNO=${encodeURIComponent(containerno)}&CMPCODE=${encodeURIComponent(cmpcode)}&CITYCODE=${encodeURIComponent(citycode)}&ASONDATE=${asondate}`
+      const body = await callUpstream(`${path}_START`, qs)
+      const { jobId } = JSON.parse(body.toString('utf8'))
+      return NextResponse.json({ jobId })
+    }
 
-    return new NextResponse(new Uint8Array(xlsxBuf), {
-      headers: {
-        'Content-Type':        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename="${filename}"`,
-      },
-    })
+    if (action === 'status') {
+      const jobId = sp.get('jobId')
+      if (!jobId) return NextResponse.json({ error: 'Missing jobId' }, { status: 400 })
+      const body = await callUpstream('IMP_WMS_REPORT_JOB_STATUS', `jobId=${encodeURIComponent(jobId)}`)
+      return new NextResponse(new Uint8Array(body), { headers: { 'Content-Type': 'application/json' } })
+    }
+
+    if (action === 'result') {
+      const jobId = sp.get('jobId')
+      const type  = sp.get('type') ?? 'stock'
+      if (!jobId) return NextResponse.json({ error: 'Missing jobId' }, { status: 400 })
+
+      const body    = await callUpstream('IMP_WMS_REPORT_JOB_RESULT', `jobId=${encodeURIComponent(jobId)}`)
+      const xlsxBuf = xlsToXlsx(body)
+
+      const asondate = sp.get('asondate') ?? ''
+      const dateSlug = asondate.replace(/\//g, '-') || 'result'
+      const filename = `${type}-report-${dateSlug}.xlsx`
+
+      return new NextResponse(new Uint8Array(xlsxBuf), {
+        headers: {
+          'Content-Type':        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+        },
+      })
+    }
+
+    return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('[reports/download] error:', message)

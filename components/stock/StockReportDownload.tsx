@@ -35,16 +35,33 @@ export default function StockReportDownload() {
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [loading])
 
+  // Report generation upstream can run well past a minute, so this doesn't hold one
+  // request open — it starts a background job, polls until done, then downloads the
+  // finished file. Each of the three calls below is fast on its own.
   async function download(type: ReportType) {
     setError(null)
     setLoading(type)
     try {
       const asondate = toApiDate(date)
-      const url = `/api/reports/download?type=${type}&asondate=${asondate}`
 
-      const res = await fetch(url)
-      if (!res.ok) throw new Error(`API error ${res.status}`)
-      const arrayBuffer = await res.arrayBuffer()
+      const startRes = await fetch(`/api/reports/download?action=start&type=${type}&asondate=${asondate}`)
+      if (!startRes.ok) throw new Error(`API error ${startRes.status}`)
+      const { jobId } = await startRes.json()
+      if (!jobId) throw new Error('No job id returned')
+
+      let status = 'pending'
+      while (status === 'pending') {
+        await new Promise(r => setTimeout(r, 3000))
+        const statusRes = await fetch(`/api/reports/download?action=status&jobId=${jobId}`)
+        if (!statusRes.ok) throw new Error(`API error ${statusRes.status}`)
+        const data = await statusRes.json()
+        status = data.status
+        if (status === 'error') throw new Error(data.error || 'Report generation failed')
+      }
+
+      const resultRes = await fetch(`/api/reports/download?action=result&jobId=${jobId}&type=${type}&asondate=${asondate}`)
+      if (!resultRes.ok) throw new Error(`API error ${resultRes.status}`)
+      const arrayBuffer = await resultRes.arrayBuffer()
 
       const blob     = new Blob([arrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
       const href     = URL.createObjectURL(blob)
@@ -118,7 +135,7 @@ export default function StockReportDownload() {
 
       {loading && (
         <p className="mt-2 text-xs text-gray-400">
-          Fetching report from server — this typically takes 30–60 seconds. Do not close the tab.
+          Building report on the server — this can take a couple of minutes. Do not close the tab.
         </p>
       )}
 
