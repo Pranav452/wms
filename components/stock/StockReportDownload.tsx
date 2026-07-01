@@ -44,11 +44,11 @@ export default function StockReportDownload() {
 
       const res = await fetch(url)
       if (!res.ok) throw new Error(`API error ${res.status}`)
-      const text = await res.text()
+      const arrayBuffer = await res.arrayBuffer()
 
-      const blob     = new Blob([text], { type: 'application/vnd.ms-excel' })
+      const blob     = new Blob([arrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
       const href     = URL.createObjectURL(blob)
-      const filename = `${type}-report-${date}.xls`
+      const filename = `${type}-report-${date}.xlsx`
       const a        = document.createElement('a')
       a.href         = href
       a.download     = filename
