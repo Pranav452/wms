@@ -14,7 +14,7 @@ function toApiDate(isoDate: string) {
 type ReportType = 'stock' | 'itemstatus'
 
 const REPORTS: { type: ReportType; label: string; desc: string; disabled?: boolean }[] = [
-  { type: 'stock',      label: 'Stock Status',     desc: 'Temporarily unavailable', disabled: true },
+  { type: 'stock',      label: 'Stock Status',     desc: 'Shipment-wise item status with MRP qty' },
   { type: 'itemstatus', label: 'Item Status (MRP)', desc: 'Shipment-wise item status with MRP qty' },
 ]
 

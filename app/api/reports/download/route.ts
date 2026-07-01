@@ -6,7 +6,7 @@ const API_BASE_HOST = '180.179.207.163'
 const API_BASE_PATH = '/ApiMP/api/Import'
 
 const PATHS: Record<string, string> = {
-  stock:      'IMP_WMS_SHIPMENTWISE_STOCKSTATUS_XL',
+  stock:      'IMP_WMS_SHIPMENTWISE_ITEMSTATUS_ALL_MRPQTY_XL',
   itemstatus: 'IMP_WMS_SHIPMENTWISE_ITEMSTATUS_ALL_MRPQTY_XL',
 }
 
