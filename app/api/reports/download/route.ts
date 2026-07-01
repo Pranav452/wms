@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import net from 'net'
+import zlib from 'zlib'
 import * as XLSX from 'xlsx'
 
 export const maxDuration = 60
@@ -38,6 +39,17 @@ function rawHttpGet(host: string, path: string): Promise<Buffer> {
         if (bodyBuf.length > contentLength) bodyBuf = bodyBuf.slice(0, contentLength)
       }
 
+      // The report job's RESULT endpoint gzips its response when asked (see
+      // Accept-Encoding below) — this payload is large, repetitive XML that shrinks a
+      // lot, and transferring less of it matters on this slow, distant link.
+      if (/^content-encoding:\s*gzip/im.test(headers)) {
+        try {
+          bodyBuf = zlib.gunzipSync(bodyBuf)
+        } catch (e) {
+          return reject(e instanceof Error ? e : new Error(String(e)))
+        }
+      }
+
       resolve(bodyBuf)
     }
 
@@ -49,7 +61,7 @@ function rawHttpGet(host: string, path: string): Promise<Buffer> {
 
     socket.connect(80, host, () => {
       socket.write(
-        `GET ${path} HTTP/1.0\r\nHost: ${host}\r\nConnection: close\r\n\r\n`
+        `GET ${path} HTTP/1.0\r\nHost: ${host}\r\nAccept-Encoding: gzip\r\nConnection: close\r\n\r\n`
       )
     })
   })
