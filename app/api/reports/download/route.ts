@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import net from 'net'
 import * as XLSX from 'xlsx'
 
+export const maxDuration = 60
+
 const API_BASE_HOST = '180.179.207.163'
 const API_BASE_PATH = '/ApiMP/api/Import'
 
