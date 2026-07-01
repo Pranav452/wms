@@ -3,6 +3,7 @@ import net from 'net'
 import * as XLSX from 'xlsx'
 
 export const maxDuration = 60
+export const preferredRegion = 'bom1'
 
 const API_BASE_HOST = '180.179.207.163'
 const API_BASE_PATH = '/ApiMP/api/Import'
