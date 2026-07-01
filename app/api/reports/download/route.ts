@@ -6,11 +6,7 @@ const API_BASE_HOST = '180.179.207.163'
 const API_BASE_PATH = '/ApiMP/api/Import'
 
 const PATHS: Record<string, string> = {
-  // IMP_WMS_SHIPMENTWISE_STOCKSTATUS_XL requires CONTAINERNO and can never return
-  // all-items data over HTTP (its null-check branch is unreachable - CONTAINERNO is a
-  // required query param). IMP_WMS_SHIPMENTWISE_STOCKSTATUS_ALL_XL is a new, separate
-  // endpoint that calls the same all-items stored procedure directly.
-  stock:      'IMP_WMS_SHIPMENTWISE_STOCKSTATUS_ALL_XL',
+  stock:      'IMP_WMS_SHIPMENTWISE_STOCKSTATUS_XL',
   itemstatus: 'IMP_WMS_SHIPMENTWISE_ITEMSTATUS_ALL_MRPQTY_XL',
 }
 
@@ -67,10 +63,7 @@ export async function GET(req: NextRequest) {
   const path = PATHS[type]
   if (!path) return NextResponse.json({ error: 'Unknown report type' }, { status: 400 })
 
-  // ALL_XL doesn't take CONTAINERNO at all (it's the itemstatus endpoint that needs
-  // the literal "All" to pick its own all-items branch).
-  const containerParam = type === 'itemstatus' ? `CONTAINERNO=${encodeURIComponent(containerno)}&` : ''
-  const qs  = `${containerParam}CMPCODE=${encodeURIComponent(cmpcode)}&CITYCODE=${encodeURIComponent(citycode)}&ASONDATE=${asondate}`
+  const qs  = `CONTAINERNO=${encodeURIComponent(containerno)}&CMPCODE=${encodeURIComponent(cmpcode)}&CITYCODE=${encodeURIComponent(citycode)}&ASONDATE=${asondate}`
   const url = `http://${API_BASE_HOST}${API_BASE_PATH}/${path}?${qs}`
 
   const parsed   = new URL(url)
