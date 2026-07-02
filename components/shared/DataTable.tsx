@@ -1,13 +1,41 @@
 "use client";
 
 import React, { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown, Search } from 'lucide-react'
 
 export interface Column<T> {
   key: keyof T | string
   header: string
   render?: (row: T) => React.ReactNode
   className?: string
+  sortable?: boolean
+}
+
+// Dates arrive from the SP as dd/mm/yyyy strings (CONVERT style 103), so plain
+// string comparison would order them wrong — normalize to a timestamp first.
+const DDMMYYYY = /^(\d{2})\/(\d{2})\/(\d{4})$/
+
+function sortValue(v: unknown): number | string | null {
+  if (v == null || v === '') return null
+  if (typeof v === 'number') return v
+  const s = String(v).trim()
+  const m = DDMMYYYY.exec(s)
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1]).getTime()
+  const n = Number(s.replace(/,/g, ''))
+  if (!Number.isNaN(n)) return n
+  return s.toLowerCase()
+}
+
+function compareRows(a: unknown, b: unknown, dir: 'asc' | 'desc'): number {
+  const av = sortValue(a)
+  const bv = sortValue(b)
+  if (av === null && bv === null) return 0
+  if (av === null) return 1  // empties always sink to the bottom
+  if (bv === null) return -1
+  const cmp = typeof av === 'number' && typeof bv === 'number'
+    ? av - bv
+    : String(av).localeCompare(String(bv))
+  return dir === 'asc' ? cmp : -cmp
 }
 
 interface Props<T extends Record<string, unknown>> {
@@ -32,6 +60,8 @@ export default function DataTable<T extends Record<string, unknown>>({
   const [query,    setQuery]    = useState('')
   const [page,     setPage]     = useState(1)
   const [pageSize, setPageSize] = useState(defaultSize)
+  const [sortKey,  setSortKey]  = useState<string | null>(null)
+  const [sortDir,  setSortDir]  = useState<'asc' | 'desc'>('asc')
 
   const filtered = useMemo(() => {
     if (!query.trim() || filterKeys.length === 0) return data
@@ -41,12 +71,25 @@ export default function DataTable<T extends Record<string, unknown>>({
     )
   }, [data, query, filterKeys])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const sorted = useMemo(() => {
+    if (!sortKey) return filtered
+    return [...filtered].sort((a, b) => compareRows(a[sortKey], b[sortKey], sortDir))
+  }, [filtered, sortKey, sortDir])
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize))
   const safePage   = Math.min(page, totalPages)
-  const slice      = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
+  const slice      = sorted.slice((safePage - 1) * pageSize, safePage * pageSize)
 
   const handleQuery = (v: string) => { setQuery(v); setPage(1) }
   const handleSize  = (v: number) => { setPageSize(v); setPage(1) }
+
+  // Click cycles asc → desc → original order
+  const handleSort = (key: string) => {
+    if (sortKey !== key)          { setSortKey(key); setSortDir('asc') }
+    else if (sortDir === 'asc')   { setSortDir('desc') }
+    else                          { setSortKey(null) }
+    setPage(1)
+  }
 
   return (
     <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
@@ -111,11 +154,36 @@ export default function DataTable<T extends Record<string, unknown>>({
         <table className="w-full text-left text-sm text-gray-600">
           <thead className="text-xs text-gray-400 uppercase bg-gray-50/60 border-b">
             <tr>
-              {columns.map(col => (
-                <th key={String(col.key)} className={`px-4 py-3 font-medium whitespace-nowrap ${col.className ?? ''}`}>
-                  {col.header}
-                </th>
-              ))}
+              {columns.map(col => {
+                const key      = String(col.key)
+                const sortable = col.sortable !== false
+                const active   = sortKey === key
+                return (
+                  <th
+                    key={key}
+                    aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
+                    className={`px-4 py-3 font-medium whitespace-nowrap ${col.className ?? ''}`}
+                  >
+                    {sortable ? (
+                      <button
+                        type="button"
+                        onClick={() => handleSort(key)}
+                        aria-label={`Sort by ${col.header}${active ? ` (${sortDir === 'asc' ? 'ascending' : 'descending'})` : ''}`}
+                        className={`inline-flex items-center gap-1 uppercase transition-colors hover:text-gray-600 ${active ? 'text-red-500' : ''}`}
+                      >
+                        {col.header}
+                        {active
+                          ? sortDir === 'asc'
+                            ? <ArrowUp className="w-3 h-3" />
+                            : <ArrowDown className="w-3 h-3" />
+                          : <ChevronsUpDown className="w-3 h-3 opacity-50" />}
+                      </button>
+                    ) : (
+                      col.header
+                    )}
+                  </th>
+                )
+              })}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -145,9 +213,9 @@ export default function DataTable<T extends Record<string, unknown>>({
       {/* Pagination */}
       <div className="px-4 py-3 border-t flex items-center justify-between gap-2 text-xs text-gray-500">
         <span className="min-w-0 truncate">
-          {filtered.length === 0
+          {sorted.length === 0
             ? 'No records'
-            : `${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, filtered.length)} of ${filtered.length}`}
+            : `${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, sorted.length)} of ${sorted.length}`}
         </span>
         <div className="flex items-center gap-1 flex-shrink-0">
           <button
