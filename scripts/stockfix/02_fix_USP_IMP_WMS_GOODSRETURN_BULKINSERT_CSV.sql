@@ -1,0 +1,173 @@
+/* ============================================================================
+   FIX: USP_IMP_WMS_GOODSRETURN_BULKINSERT_CSV
+   ----------------------------------------------------------------------------
+   BUG: same multiplier defect as USP_IMP_WMS_GOODSRETURN_INSERT_DTLS — the
+   COMMON_CONTR stock-add block joined WMS_ITEM_STOCK_MASTER_COMMON_CONTR
+   inside the SUM() subquery on FK_ITEMID only (no container match), so an
+   item present in N containers had its returned qty multiplied by N.
+   This SP is the KIABI CSV bulk-return path (SCANTYPE='E', 92 vouchers), so
+   it likely produced most of the 700 overstated rows.
+
+   FIX: subquery aggregates plain TBL_IMP_WMS_GOODSRETURN_DTLS grouped by
+   (FK_ITEMID, CONTAINERNO); outer join matches both keys. No stock-table
+   self-join. Item-level block similarly de-joined. Everything else identical.
+   ============================================================================ */
+
+ALTER PROCEDURE [dbo].[USP_IMP_WMS_GOODSRETURN_BULKINSERT_CSV]
+	@FILEPATH VARCHAR(150),
+	@FILENAME VARCHAR(200),
+	@FK_LOGID INT,
+	@CLIENT VARCHAR(12),
+	@CLIENTADDID INT,
+	@GRTNDATE VARCHAR(10),
+	@RETURNDATE VARCHAR(100),
+	@RETURNNO VARCHAR(100),
+	@CLIENTINVNO VARCHAR(100),
+	@CMPCODE VARCHAR(2),
+	@CITYCODE VARCHAR(3),
+	@CITYCODE1 VARCHAR(3),
+	@MAKERID INT,
+	@MAKERIP VARCHAR(50)
+
+AS
+
+BEGIN
+    SET NOCOUNT ON;
+
+	 DECLARE @SQL NVARCHAR(MAX);
+ IF OBJECT_ID('TEMPDB..#TempExcelData') IS NOT NULL
+DROP TABLE  #TempExcelData
+    /* Temp table */
+    CREATE TABLE #TempExcelData
+    (
+        [DATE]  VARCHAR(20),
+        FRMLOCATION  VARCHAR(15),
+        EAN  VARCHAR(15),
+        KIABICODE  VARCHAR(100),
+        BOXNO  VARCHAR(100),
+        PIECES  VARCHAR(100),
+        INVNO  VARCHAR(100),
+        RONO  VARCHAR(100),
+        REMARK  VARCHAR(200),
+        TRACKINGNO VARCHAR(100)
+    );
+
+SET @SQL = '
+BULK INSERT #TempExcelData
+FROM ''' + @FILEPATH + '''
+WITH (
+    FIRSTROW = 2,
+    FIELDTERMINATOR = '','',
+    ROWTERMINATOR = ''\n''
+)';
+
+
+  EXEC sp_executesql @SQL;
+
+	DECLARE	 @PRECODE AS VARCHAR(15)
+				,@INTCNT AS INT
+				,@RIGHTNUM AS VARCHAR(10)
+				,@VOUCHERTYPE AS VARCHAR(3),
+				@GRTNNO  VARCHAR(15)
+
+			SET @VOUCHERTYPE = 'GRTIN'
+
+		SET @PRECODE =	 SUBSTRING(@CMPCODE,2,1) + @CITYCODE1 + @VOUCHERTYPE
+						+ SUBSTRING(@GRTNDATE, 9, 2)
+						+ SUBSTRING(@GRTNDATE, 4, 2)
+
+
+
+		EXEC [DBO].[USP_IMP_WMS_INSERT_CODE] 'GRTN', @PRECODE,  @GRTNNO OUTPUT
+
+		INSERT INTO TBL_IMP_WMS_GOODSRETURN_MST
+				(
+					GRTNNO,
+					GRTNDATE,
+					CLIENT,
+					CLIENTADDID,
+					RETURNNO,
+					CLIENTINVNO,
+					RETURNDATE,
+					MAKERID,
+					MAKERDT,
+					MAKERIP,
+					CMPCODE,
+					CITYCODE,
+					SCANTYPE
+				)
+				VALUES
+				(
+					@GRTNNO,
+					@GRTNDATE,
+					@CLIENT,
+					@CLIENTADDID,
+					@RETURNNO,
+					@CLIENTINVNO,
+					CASE WHEN @RETURNDATE='' THEN NULL ELSE CONVERT(DATETIME,@RETURNDATE,103)END,
+					@MAKERID,
+					GETDATE(),
+					@MAKERIP,
+					@CMPCODE,
+					@CITYCODE,
+					'E'
+				)
+
+				INSERT INTO TBL_IMP_WMS_GOODSRETURN_DTLS (
+							fk_grtnno,
+							FK_ITEMID,
+							RETURNQTY,
+							UOM,
+							EAN,
+							FK_RETURNREASON,
+							FK_RETURNTYPE,
+							CONTAINERNO,
+							BOXNO,
+							KIABICODE
+						)
+						SELECT
+							@GRTNNO,
+							PK_ITEMID,
+							PIECES=SUM(CONVERT(INT,PIECES)),
+							'PIECES',
+							#TempExcelData.EAN,
+							1,  ---RETURNREASON
+							3,  ----RETURNTYPE
+							dbo.GetContainerNoforGoodsReturn(#TempExcelData.EAN) AS CONTAINERNO,
+							ISNULL(BOXNO,''),
+							ISNULL(KIABICODE,'')
+							FROM
+							#TempExcelData  INNER JOIN
+							WMS_ITEM_MASTER ON  WMS_ITEM_MASTER.EAN=#TempExcelData.EAN
+							GROUP BY
+							PK_ITEMID,
+							#TempExcelData.EAN,
+							dbo.GetContainerNoforGoodsReturn(#TempExcelData.EAN),
+							BOXNO,
+							KIABICODE
+
+		 /* UPDATING CURRENT & OPENING STOCK */
+
+		  	UPDATE  A SET A.CURRENTSTOCK=ISNULL(A.CURRENTSTOCK,0)+B.RETURNQTY,
+			A.BALANCESTOCK=ISNULL(A.BALANCESTOCK,0)+B.RETURNQTY
+			FROM	WMS_ITEM_STOCK_MASTER A INNER JOIN
+			(SELECT RETURNQTY=SUM(DTLS.RETURNQTY),DTLS.FK_ITEMID FROM TBL_IMP_WMS_GOODSRETURN_DTLS  DTLS
+			WHERE DTLS.FK_RETURNREASON=1 AND DTLS.FK_GRTNNO=@GRTNNO
+			GROUP BY DTLS.FK_ITEMID) B
+			ON A.FK_ITEMID=B.FK_ITEMID
+
+		     /* END UPDATING CURRENT STOCK */
+
+			 	 /* UPDATING CURRENT & OPENING STOCK IN COMMON CONTAINER
+			 	    FIX: join on FK_ITEMID AND CONTAINERNO — no stock-table self-join */
+
+		  	UPDATE  A SET A.CURRENTSTOCK=ISNULL(A.CURRENTSTOCK,0)+B.RETURNQTY,
+			A.BALANCESTOCK=ISNULL(A.BALANCESTOCK,0)+B.RETURNQTY
+			FROM	WMS_ITEM_STOCK_MASTER_COMMON_CONTR A INNER JOIN
+			(SELECT RETURNQTY=SUM(DTLS.RETURNQTY),DTLS.FK_ITEMID,DTLS.CONTAINERNO FROM TBL_IMP_WMS_GOODSRETURN_DTLS  DTLS
+			WHERE DTLS.FK_RETURNREASON=1 AND DTLS.FK_GRTNNO=@GRTNNO
+			GROUP BY DTLS.FK_ITEMID,DTLS.CONTAINERNO) B
+			ON A.FK_ITEMID=B.FK_ITEMID AND A.CONTAINERNO=B.CONTAINERNO
+
+			SELECT '100' STATUS ,  MSG= @GRTNNO + ' GENERATED SUCCESSFULLY'
+END
