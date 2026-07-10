@@ -98,6 +98,28 @@ export function locationCode(rack: string, level: number, col: number): string {
   return `${rack}${String(level).padStart(2, '0')}${colLetter(col)}`
 }
 
+// ── DB-matching bin codes ─────────────────────────────────────────────────────
+// The WMS DB (WMS_ITEM_STOCK_MASTER_COMMON_CONTR.rackNo) addresses the two
+// floors differently:
+//   First floor:  <Rack><Shelf 01-55><Side A|B>  e.g. "H24A" — shelf numbers
+//     are sequential per rack (max = bays × levels, verified per rack).
+//     Numbering order across the grid is assumed level-major (shelf 1..bays on
+//     level 1, then level 2, …) — placement is cosmetic, binding is by code.
+//   Ground floor: <Rack><Level2><Position>       e.g. "GB01A" — locationCode().
+
+export function shelfNumber(rack: Rack, level: number, bay: number): number {
+  return (level - 1) * rack.bays + bay
+}
+
+export function cellCode(rack: Rack, level: number, col: number): string {
+  if (rack.floor === 'first') {
+    const bay = Math.floor(col / POSITIONS_PER_SHELF) + 1
+    const side = colLetter(col % POSITIONS_PER_SHELF) // A | B
+    return `${rack.name}${String(shelfNumber(rack, level, bay)).padStart(2, '0')}${side}`
+  }
+  return locationCode(rack.name, level, col)
+}
+
 // Structured detail for the side drawer.
 export interface LocationInfo {
   code: string
@@ -105,20 +127,23 @@ export interface LocationInfo {
   floorLabel: string
   rack: string
   level: number
+  shelf: number    // sequential shelf number (first-floor addressing)
   position: string // A, B, C…
   bay: number      // physical bay (1-based)
   side: 'Left' | 'Right'
 }
 
 export function locationInfo(rack: Rack, level: number, col: number): LocationInfo {
+  const bay = Math.floor(col / POSITIONS_PER_SHELF) + 1
   return {
-    code: locationCode(rack.name, level, col),
+    code: cellCode(rack, level, col),
     floor: rack.floor,
     floorLabel: FLOORS.find(f => f.id === rack.floor)!.label,
     rack: rack.name,
     level,
-    position: colLetter(col),
-    bay: Math.floor(col / POSITIONS_PER_SHELF) + 1,
+    shelf: shelfNumber(rack, level, bay),
+    position: rack.floor === 'first' ? colLetter(col % POSITIONS_PER_SHELF) : colLetter(col),
+    bay,
     side: col % POSITIONS_PER_SHELF === 0 ? 'Left' : 'Right',
   }
 }
