@@ -20,8 +20,10 @@ export interface StockItem {
   name: string
   size: string
   color: string
-  avail: number // currentstock — available quantity
-  recd: number  // qty — received quantity
+  avail: number // computed balance = GRN − issued + returned (ERP method)
+  recd: number  // GRN receipt qty
+  iss: number   // issued qty
+  rtn: number   // returned qty
   cont: string  // container number(s)
 }
 
@@ -113,8 +115,10 @@ export interface RawStockRow {
   ItemName: string | null
   Size: string | null
   color: string | null
-  currentstock: number | null
-  qty: number | null
+  grnqty: number | null
+  issqty: number | null
+  rtnqty: number | null
+  avail: number | null
   containerno: string | null
 }
 
@@ -127,12 +131,16 @@ export function buildRackStock(rows: RawStockRow[]): RackStockData {
   const addItem = (map: Map<string, StockItem>, r: RawStockRow) => {
     const ean = r.EAN ?? ''
     const prev = map.get(ean)
-    const avail = r.currentstock ?? 0
-    const recd = r.qty ?? 0
+    const avail = r.avail ?? 0
+    const recd = r.grnqty ?? 0
+    const iss = r.issqty ?? 0
+    const rtn = r.rtnqty ?? 0
     const cont = r.containerno ?? ''
     if (prev) { // same EAN received twice into the same location — merge
       prev.avail += avail
       prev.recd += recd
+      prev.iss += iss
+      prev.rtn += rtn
       if (cont && !prev.cont.includes(cont)) prev.cont += `, ${cont}`
     } else {
       map.set(ean, {
@@ -141,7 +149,7 @@ export function buildRackStock(rows: RawStockRow[]): RackStockData {
         name: r.ItemName ?? '',
         size: r.Size ?? '',
         color: r.color ?? '',
-        avail, recd, cont,
+        avail, recd, iss, rtn, cont,
       })
     }
   }
@@ -150,7 +158,7 @@ export function buildRackStock(rows: RawStockRow[]): RackStockData {
   const totalEans = new Set<string>()
 
   for (const r of rows) {
-    totalUnits += r.currentstock ?? 0
+    totalUnits += r.avail ?? 0
     if (r.EAN) totalEans.add(r.EAN)
 
     const code = normalizeRackNo(r.rackNo)

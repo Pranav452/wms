@@ -372,7 +372,9 @@ function LocationDrawer({ target, onClose }: { target: DrawerTarget; onClose: ()
                   </div>
                   <div className="flex items-center justify-between gap-2 mt-0.5">
                     <span className="font-mono text-[11px] text-red-500 truncate">{it.sku}</span>
-                    <span className="text-[10px] text-gray-400 flex-shrink-0">of {formatNumber(it.recd)} recd</span>
+                    <span className="text-[10px] text-gray-400 flex-shrink-0 tabular-nums">
+                      recd {formatNumber(it.recd)} − out {formatNumber(it.iss)}{it.rtn > 0 ? ` + rtn ${formatNumber(it.rtn)}` : ''}
+                    </span>
                   </div>
                   <p className="text-[11px] text-gray-500 truncate mt-0.5" title={it.name}>{it.name}</p>
                   <p className="text-[10px] text-gray-400 mt-0.5">
