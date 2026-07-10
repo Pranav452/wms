@@ -81,6 +81,7 @@ export interface RS11_POvsDispatch {
 export interface RS12_POTracking {
   PONO:               string
   CLIENT:             string
+  STR_CREATION_DATE:  string
   PO_QTY:            number
   DISPATCHED:        number
   BALANCE:           number

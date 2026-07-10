@@ -12,6 +12,13 @@ import type { RS12_POTracking } from '@/types/dashboard'
 const poColumns: Column<RS12_POTracking>[] = [
   { key: 'PONO',               header: 'PO No',        className: 'font-medium text-gray-900 text-xs' },
   { key: 'CLIENT',             header: 'Client',        className: 'text-gray-600 text-xs' },
+  {
+    key: 'STR_CREATION_DATE',
+    header: 'STR Created',
+    render: r => r.STR_CREATION_DATE
+      ? <span className="text-xs text-gray-600">{r.STR_CREATION_DATE}</span>
+      : <span className="text-xs text-gray-300">—</span>,
+  },
   { key: 'SKU_COUNT',          header: 'SKUs',          render: r => formatNumber(r.SKU_COUNT) },
   { key: 'PO_QTY',             header: 'PO Qty',        render: r => formatNumber(r.PO_QTY) },
   { key: 'DISPATCHED',         header: 'Dispatched',    render: r => formatNumber(r.DISPATCHED) },
