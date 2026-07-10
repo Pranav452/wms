@@ -39,7 +39,7 @@ const LABEL_COLORS = ['#22c55e', '#ef4444', '#f59e0b']
 const ARTICLE_COLORS = ['#ef4444', '#f87171', '#fca5a5', '#fecaca', '#fee2e2', '#1e1e1e', '#374151', '#6b7280']
 
 export default function OverviewPage() {
-  const { data, loading, error } = useDashboard()
+  const { data, loading, error, fromDate } = useDashboard()
 
   if (loading) return <><Header title="Overview" breadcrumb="Overview" /><OverviewSkeleton /></>
   if (error)   return <><Header title="Overview" breadcrumb="Overview" /><ErrorState message={error} /></>
@@ -48,6 +48,15 @@ export default function OverviewPage() {
   const k  = data.kpi
   const lb = data.labelStatus
   const bl = data.backlog
+
+  // With a date range active, the movement KPIs show the window totals
+  // (RS21); balance/stock figures stay as-on the end date.
+  const ranged  = Boolean(fromDate) && data.rangeKpi !== null
+  const rk      = data.rangeKpi
+  const flowSub = ranged ? 'in period' : undefined
+  const receiptQty = ranged ? rk!.GRN_QTY      : k?.RECEIPT_QTY ?? 0
+  const issueQty   = ranged ? rk!.DISPATCH_QTY : k?.ISSUE_QTY ?? 0
+  const returnQty  = ranged ? rk!.RETURN_QTY   : k?.RETURN_QTY ?? 0
 
   const labelDonutData = lb ? [
     { name: 'FP / Done',  value: lb.FP },
@@ -99,9 +108,9 @@ export default function OverviewPage() {
         </div>
 
         <div className="col-span-12 sm:col-span-8 grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <KPICard icon={<ArrowDownToLine className="w-4 h-4 text-red-500" />} label="Total Receipt"   value={formatNumber(k?.RECEIPT_QTY ?? 0)} />
-          <KPICard icon={<ArrowUpFromLine  className="w-4 h-4 text-red-500" />} label="Total Issued"   value={formatNumber(k?.ISSUE_QTY ?? 0)} />
-          <KPICard icon={<RotateCcw        className="w-4 h-4 text-red-500" />} label="Total Returns"  value={formatNumber(k?.RETURN_QTY ?? 0)} />
+          <KPICard icon={<ArrowDownToLine className="w-4 h-4 text-red-500" />} label={ranged ? 'Receipt' : 'Total Receipt'}  value={formatNumber(receiptQty)} sub={flowSub} />
+          <KPICard icon={<ArrowUpFromLine  className="w-4 h-4 text-red-500" />} label={ranged ? 'Issued'  : 'Total Issued'}  value={formatNumber(issueQty)}   sub={flowSub} />
+          <KPICard icon={<RotateCcw        className="w-4 h-4 text-red-500" />} label={ranged ? 'Returns' : 'Total Returns'} value={formatNumber(returnQty)}  sub={flowSub} />
           <KPICard icon={<ShoppingCart     className="w-4 h-4 text-red-500" />} label="PO Qty"         value={formatNumber(k?.PO_QTY ?? 0)} />
           <KPICard icon={<Boxes            className="w-4 h-4 text-red-500" />} label="Containers"     value={formatNumber(k?.CONTAINER_COUNT ?? 0)} />
           <KPICard icon={<Package          className="w-4 h-4 text-red-500" />} label="Unique SKUs"    value={formatNumber(k?.SKU_COUNT ?? 0)} />

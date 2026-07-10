@@ -40,6 +40,9 @@ AS/*
 
 /*
   USP_WMS_DASHBOARD_V3  -  WMS Stock-Status Dashboard (25 result sets)
+  v3.3: with @FROMDATE set, RS3 stock rows limit to EANs with receipt/issue/
+    return activity in the window and RS13 limits to containers with receipts
+    in the window (qty columns stay as-on lifetime values).
   v3.2 (KIABI mail 09/07/2026):
     - @FROMDATE optional range start; flow recordsets (RS6, RS8, RS10, RS15,
       RS18, RS19) filter to the window, stock recordsets stay as-on @ASONDATE
@@ -173,6 +176,26 @@ BEGIN
       AND ISNULL(M.RETURNDATE, CONVERT(DATETIME, M.GRTNDATE, 103)) <= @TEOD
       AND (@FDATE IS NULL OR ISNULL(M.RETURNDATE, CONVERT(DATETIME, M.GRTNDATE, 103)) >= @FDATE);
 
+    /* ── STEP 10: EANs with activity in the window (range row-filter) ── */
+    IF OBJECT_ID('tempdb..#WEAN') IS NOT NULL DROP TABLE #WEAN;
+    CREATE TABLE #WEAN (EAN VARCHAR(16) PRIMARY KEY);
+    IF @FDATE IS NOT NULL
+        INSERT INTO #WEAN
+        SELECT DISTINCT X.EAN FROM (
+            SELECT G.EAN FROM #GRN G WHERE G.GRNDATE >= @FDATE
+            UNION ALL
+            SELECT GD.EAN
+            FROM tbl_imp_wms_goodsissue_mst GM
+            JOIN tbl_imp_wms_goodsissue_dtls GD ON GD.FK_GINNO = GM.GINNO
+            WHERE GM.CITYCODE = @CITYCODE
+              AND GM.ISSUEDATE >= @FDATE AND GM.ISSUEDATE <= @TEOD
+            UNION ALL
+            SELECT D.EAN
+            FROM #RTV R
+            JOIN tbl_imp_wms_goodsreturn_dtls D ON D.FK_GRTNNO = R.GRTNNO
+        ) X
+        WHERE X.EAN IS NOT NULL;
+
     /* ════════════════════════════════════════════════════════════
        RS1 : KPI SUMMARY
     ════════════════════════════════════════════════════════════ */
@@ -204,6 +227,8 @@ BEGIN
 
     /* ════════════════════════════════════════════════════════════
        RS3 : STOCK BY EAN/SKU
+       With a range: only EANs that had receipt/issue/return activity
+       in the window (qty columns remain lifetime as-on values).
     ════════════════════════════════════════════════════════════ */
     SELECT
         SRNO       = ROW_NUMBER() OVER (ORDER BY S.EAN),
@@ -212,7 +237,8 @@ BEGIN
         PO_QTY     = ISNULL(P.PO_QTY, 0),
         OLDEST_GRN = CONVERT(VARCHAR(10), S.OLDEST_GRN, 103),
         S.AGING_DAYS
-    FROM #STOCK S LEFT JOIN #PO P ON P.EAN = S.EAN;
+    FROM #STOCK S LEFT JOIN #PO P ON P.EAN = S.EAN
+    WHERE (@FDATE IS NULL OR S.EAN IN (SELECT EAN FROM #WEAN));
 
     /* ════════════════════════════════════════════════════════════
        RS4 : AGING BUCKETS
@@ -358,6 +384,7 @@ BEGIN
         ), 0)
     FROM #GRN G
     GROUP BY G.CONTAINERNO, G.SHIPMENTTYPE
+    HAVING (@FDATE IS NULL OR MAX(G.GRNDATE) >= @FDATE)
     ORDER BY MIN(G.GRNDATE) DESC;
 
     /* ════════════════════════════════════════════════════════════
