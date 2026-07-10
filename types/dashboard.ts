@@ -154,6 +154,7 @@ export interface RS20_POValue {
 
 export interface RS21_RangeKPI {
   STR_COUNT:            number
+  STR_QTY:              number
   GRN_QTY:              number
   DISPATCH_QTY:         number
   GIN_COUNT:            number
@@ -162,6 +163,8 @@ export interface RS21_RangeKPI {
   GRTN_COUNT:           number
   RETURN_USABLE_QTY:    number
   RETURN_NONUSABLE_QTY: number
+  CONTAINER_COUNT:      number
+  SKU_COUNT:            number
 }
 
 export interface RS22_STRTracking {

@@ -57,6 +57,9 @@ export default function OverviewPage() {
   const receiptQty = ranged ? rk!.GRN_QTY      : k?.RECEIPT_QTY ?? 0
   const issueQty   = ranged ? rk!.DISPATCH_QTY : k?.ISSUE_QTY ?? 0
   const returnQty  = ranged ? rk!.RETURN_QTY   : k?.RETURN_QTY ?? 0
+  const poQty      = ranged ? rk!.STR_QTY         : k?.PO_QTY ?? 0
+  const contCount  = ranged ? rk!.CONTAINER_COUNT : k?.CONTAINER_COUNT ?? 0
+  const skuCount   = ranged ? rk!.SKU_COUNT       : k?.SKU_COUNT ?? 0
 
   const labelDonutData = lb ? [
     { name: 'FP / Done',  value: lb.FP },
@@ -111,9 +114,9 @@ export default function OverviewPage() {
           <KPICard icon={<ArrowDownToLine className="w-4 h-4 text-red-500" />} label={ranged ? 'Receipt' : 'Total Receipt'}  value={formatNumber(receiptQty)} sub={flowSub} />
           <KPICard icon={<ArrowUpFromLine  className="w-4 h-4 text-red-500" />} label={ranged ? 'Issued'  : 'Total Issued'}  value={formatNumber(issueQty)}   sub={flowSub} />
           <KPICard icon={<RotateCcw        className="w-4 h-4 text-red-500" />} label={ranged ? 'Returns' : 'Total Returns'} value={formatNumber(returnQty)}  sub={flowSub} />
-          <KPICard icon={<ShoppingCart     className="w-4 h-4 text-red-500" />} label="PO Qty"         value={formatNumber(k?.PO_QTY ?? 0)} />
-          <KPICard icon={<Boxes            className="w-4 h-4 text-red-500" />} label="Containers"     value={formatNumber(k?.CONTAINER_COUNT ?? 0)} />
-          <KPICard icon={<Package          className="w-4 h-4 text-red-500" />} label="Unique SKUs"    value={formatNumber(k?.SKU_COUNT ?? 0)} />
+          <KPICard icon={<ShoppingCart     className="w-4 h-4 text-red-500" />} label={ranged ? 'STR Qty' : 'PO Qty'} value={formatNumber(poQty)} sub={ranged ? 'STRs created in period' : undefined} />
+          <KPICard icon={<Boxes            className="w-4 h-4 text-red-500" />} label="Containers"     value={formatNumber(contCount)} sub={flowSub} />
+          <KPICard icon={<Package          className="w-4 h-4 text-red-500" />} label={ranged ? 'Active SKUs' : 'Unique SKUs'} value={formatNumber(skuCount)} sub={flowSub} />
           <KPICard icon={<Clock            className="w-4 h-4 text-red-500" />} label="Aging 90+ Days" value={formatNumber(k?.AGING_90_PLUS ?? 0)} sub="units" />
           <KPICard icon={<TrendingDown     className="w-4 h-4 text-red-500" />} label="Unfulfilled PO" value={formatNumber(k?.UNFULFILLED_PO_QTY ?? 0)} sub="units still owed" />
         </div>

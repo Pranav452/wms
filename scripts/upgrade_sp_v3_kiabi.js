@@ -505,6 +505,11 @@ BEGIN
         STR_COUNT = (SELECT COUNT(*) FROM #STRD
                      WHERE STR_DT IS NOT NULL AND STR_DT <= @TEOD
                        AND (@FDATE IS NULL OR STR_DT >= @FDATE)),
+        STR_QTY = (SELECT ISNULL(SUM(CONVERT(INT, PO.QTY)), 0)
+                   FROM TBL_WMS_CLIENTPO PO
+                   JOIN #STRD S ON S.PONO = PO.PONO
+                   WHERE S.STR_DT IS NOT NULL AND S.STR_DT <= @TEOD
+                     AND (@FDATE IS NULL OR S.STR_DT >= @FDATE)),
         GRN_QTY = (SELECT ISNULL(SUM(G.RECEIPT_QTY), 0) FROM #GRN G
                    WHERE @FDATE IS NULL OR G.GRNDATE >= @FDATE),
         DISPATCH_QTY = (SELECT ISNULL(SUM(GD.ISSUEQTY), 0)
@@ -525,7 +530,12 @@ BEGIN
                              WHERE D.FK_RETURNREASON = 1),
         RETURN_NONUSABLE_QTY = (SELECT ISNULL(SUM(D.RETURNQTY), 0)
                                 FROM #RTV R JOIN tbl_imp_wms_goodsreturn_dtls D ON D.FK_GRTNNO = R.GRTNNO
-                                WHERE ISNULL(D.FK_RETURNREASON, 0) = 0);
+                                WHERE ISNULL(D.FK_RETURNREASON, 0) = 0),
+        CONTAINER_COUNT = (SELECT COUNT(DISTINCT G.CONTAINERNO) FROM #GRN G
+                           WHERE @FDATE IS NULL OR G.GRNDATE >= @FDATE),
+        SKU_COUNT = CASE WHEN @FDATE IS NULL
+                         THEN (SELECT COUNT(DISTINCT EAN) FROM #GRN)
+                         ELSE (SELECT COUNT(*) FROM #WEAN) END;
 
     /* ════════════════════════════════════════════════════════════
        RS22 : STR TRACKING (PO level + STR date + dispatch TAT)
