@@ -1,5 +1,15 @@
 # currentstock drift — root cause + fix scripts
 
+> **EXECUTED IN PRODUCTION 2026-07-10 ~17:45 IST.** Steps run, in order:
+> full backups (`WMS_ITEM_STOCK_MASTER_COMMON_CONTR_BKUP_20260710_PRE_STOCKFIX`
+> 35,051 rows; `WMS_ITEM_STOCK_MASTER_BKUP_20260710_PRE_STOCKFIX` 32,655 rows;
+> original SP definitions in `original_sps_backup_20260710/`), then SP fixes
+> `01`–`05`, then repair `07` (779 container rows + 189 item rows fixed, audit
+> in `WMS_STOCKFIX_AUDIT_20260710`). Post-check: all 35,051 rows drift-free;
+> stored total = computed total = 72,439; EAN 3616035872832 back to 20.
+> **Revert path: `08_revert_stockfix.sql`** (data) + the saved original SP
+> definitions (procedures).
+
 `WMS_ITEM_STOCK_MASTER_COMMON_CONTR.currentstock` disagrees with the
 authoritative balance (GRN − issued + returned per EAN+container) on ~780 of
 35k rows: 700 overstated (+5,207 units), 79 understated (−401 units) as of

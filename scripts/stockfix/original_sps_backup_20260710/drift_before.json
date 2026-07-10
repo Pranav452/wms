@@ -1,0 +1,17 @@
+[
+  {
+    "bucket": "OK",
+    "rows_affected": 34272,
+    "delta_units": 0
+  },
+  {
+    "bucket": "OVERSTATED",
+    "rows_affected": 700,
+    "delta_units": 5207
+  },
+  {
+    "bucket": "UNDERSTATED",
+    "rows_affected": 79,
+    "delta_units": -401
+  }
+]
