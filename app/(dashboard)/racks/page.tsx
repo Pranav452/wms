@@ -5,6 +5,7 @@ import { X, PackageSearch, Boxes, Layers, Box, List as ListIcon, LayoutGrid, Loa
 import Header from '@/components/layout/Header'
 import {
   FLOORS,
+  RACKS,
   racksOnFloor,
   locationInfo,
   colLetter,
@@ -45,14 +46,18 @@ const BUCKET_SWATCH: Record<FillBucket, string> = {
   high:  'bg-emerald-500 border border-emerald-500',
 }
 
-// per-rack rollup computed from live cells
-interface RackRoll { units: number; eans: number; bins: number }
-const EMPTY_ROLL: RackRoll = { units: 0, eans: 0, bins: 0 }
+// per-rack rollup computed from live cells; extras = overflow bins (C…)
+// squeezed onto first-floor shelves beyond the nominal 2 per shelf
+interface RackRoll { units: number; eans: number; bins: number; extras: number }
+const EMPTY_ROLL: RackRoll = { units: 0, eans: 0, bins: 0, extras: 0 }
 
-// A few shelves hold extra bins (C…) beyond the nominal 2, so occupied can
-// exceed nominal capacity — clamp the percentage at 100.
+// capacity = nominal bins + overflow bins the DB actually has stock in
+function rackCapacity(rack: Rack, roll: RackRoll): number {
+  return rack.locations + roll.extras
+}
+
 function occupancyPct(rack: Rack, roll: RackRoll): number {
-  return Math.min(100, Math.round((roll.bins / rack.locations) * 100))
+  return Math.min(100, Math.round((roll.bins / rackCapacity(rack, roll)) * 100))
 }
 
 function metricValue(rack: Rack, roll: RackRoll, metric: Metric): string {
@@ -142,7 +147,7 @@ function RackTile({ rack, roll, metric, active, onClick }: { rack: Rack; roll: R
       <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden mb-1">
         <div className="h-full rounded-full bg-emerald-400" style={{ width: `${pct}%` }} />
       </div>
-      <div className="text-[9px] text-gray-400">{roll.bins}/{rack.locations} bins · {formatNumber(roll.eans)} EANs</div>
+      <div className="text-[9px] text-gray-400">{roll.bins}/{rackCapacity(rack, roll)} bins · {formatNumber(roll.eans)} EANs</div>
     </button>
   )
 }
@@ -165,7 +170,7 @@ function RackRow({ rack, roll, metric, active, onClick }: { rack: Rack; roll: Ra
         <div className="flex-1 min-w-0 h-1.5 rounded-full bg-gray-100 overflow-hidden">
           <div className="h-full rounded-full bg-emerald-400" style={{ width: `${pct}%` }} />
         </div>
-        <span className="text-[9px] text-gray-400 flex-shrink-0">{roll.bins}/{rack.locations} · {formatNumber(roll.eans)} EANs</span>
+        <span className="text-[9px] text-gray-400 flex-shrink-0">{roll.bins}/{rackCapacity(rack, roll)} · {formatNumber(roll.eans)} EANs</span>
       </div>
     </button>
   )
@@ -286,7 +291,7 @@ function FocusedPanel({ rack, roll, cellMap, bucketOf, thresholds, onPick, selec
           </p>
         </div>
         <div className="flex gap-2">
-          <MiniStat label="Occupied bins" value={`${roll.bins}/${rack.locations}`} />
+          <MiniStat label="Occupied bins" value={`${roll.bins}/${rackCapacity(rack, roll)}`} />
           <MiniStat label="Units" value={formatNumber(roll.units)} />
           <MiniStat label="EANs" value={formatNumber(roll.eans)} />
         </div>
@@ -478,11 +483,14 @@ export default function RacksPage() {
   }, [data])
 
   const rackRoll = useMemo(() => {
+    const byName = new Map(RACKS.map(r => [r.name, r]))
     const m = new Map<string, RackRoll>()
     data?.cells.forEach(c => {
       if (!c.rack) return
-      const r = m.get(c.rack) ?? { units: 0, eans: 0, bins: 0 }
+      const r = m.get(c.rack) ?? { units: 0, eans: 0, bins: 0, extras: 0 }
       r.units += c.units; r.eans += c.eans; r.bins += 1
+      // first-floor codes end in the side letter; anything past B is an overflow bin
+      if (byName.get(c.rack)?.floor === 'first' && c.code.charCodeAt(c.code.length - 1) > 66) r.extras += 1
       m.set(c.rack, r)
     })
     return m
