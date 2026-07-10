@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { X, PackageSearch, Boxes, Layers, Box, Barcode, List as ListIcon, LayoutGrid, Loader2, AlertTriangle, RefreshCw } from 'lucide-react'
+import { X, PackageSearch, Boxes, Layers, Box, List as ListIcon, LayoutGrid, Loader2, AlertTriangle, RefreshCw } from 'lucide-react'
 import Header from '@/components/layout/Header'
 import {
   FLOORS,
@@ -31,15 +31,18 @@ const METRICS: { id: Metric; label: string }[] = [
   { id: 'eans',      label: 'EANs' },
 ]
 
-// fill colour scale — white = empty, green = light, amber = filling, red = heavy
+// bin fill — single green scale: darker = more stock, white = empty
 const BUCKET_CELL: Record<FillBucket, string> = {
   empty: 'bg-white text-gray-300 border-gray-100 hover:border-gray-300',
-  low:   'bg-emerald-50 text-emerald-700 border-emerald-200 hover:border-emerald-400',
-  mid:   'bg-amber-50 text-amber-700 border-amber-200 hover:border-amber-400',
-  high:  'bg-red-50 text-red-600 border-red-200 hover:border-red-400',
+  low:   'bg-emerald-50 text-emerald-800 border-emerald-200 hover:border-emerald-400',
+  mid:   'bg-emerald-200 text-emerald-900 border-emerald-300 hover:border-emerald-500',
+  high:  'bg-emerald-500 text-white border-emerald-500 hover:border-emerald-600',
 }
-const BUCKET_BAR: Record<Exclude<FillBucket, 'empty'>, string> = {
-  low: 'bg-emerald-400', mid: 'bg-amber-400', high: 'bg-red-400',
+const BUCKET_SWATCH: Record<FillBucket, string> = {
+  empty: 'bg-white border border-gray-200',
+  low:   'bg-emerald-50 border border-emerald-200',
+  mid:   'bg-emerald-200 border border-emerald-300',
+  high:  'bg-emerald-500 border border-emerald-500',
 }
 
 // per-rack rollup computed from live cells
@@ -58,17 +61,65 @@ function metricValue(rack: Rack, roll: RackRoll, metric: Metric): string {
   return formatNumber(roll.eans)
 }
 
-// ── floor metric tile ────────────────────────────────────────────────────────
-function StatTile({ icon: Icon, label, value, sub }: { icon: typeof Box; label: string; value: string; sub?: string }) {
+// ── KPI tile ─────────────────────────────────────────────────────────────────
+function StatTile({ icon: Icon, label, value, sub, tone = 'default', onClick }: {
+  icon: typeof Box; label: string; value: string; sub?: string
+  tone?: 'default' | 'alert'
+  onClick?: () => void
+}) {
+  const Tag = onClick ? 'button' : 'div'
   return (
-    <div className="flex items-center gap-3 bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3">
-      <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center text-red-500 flex-shrink-0">
+    <Tag
+      onClick={onClick}
+      className={`flex items-center gap-3 rounded-2xl border shadow-sm px-4 py-3 text-left w-full ${
+        tone === 'alert'
+          ? 'bg-red-50/60 border-red-200 hover:border-red-300'
+          : 'bg-white border-gray-100'
+      } ${onClick ? 'cursor-pointer transition-colors' : ''}`}
+    >
+      <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+        tone === 'alert' ? 'bg-red-100 text-red-600' : 'bg-red-50 text-red-500'
+      }`}>
         <Icon className="w-4.5 h-4.5" />
       </div>
       <div className="min-w-0">
         <p className="text-[11px] text-gray-400 leading-none">{label}</p>
-        <p className="text-lg font-bold text-gray-900 leading-tight tabular-nums">{value}</p>
+        <p className={`text-lg font-bold leading-tight tabular-nums ${tone === 'alert' ? 'text-red-700' : 'text-gray-900'}`}>{value}</p>
         {sub && <p className="text-[10px] text-gray-400 leading-none">{sub}</p>}
+      </div>
+    </Tag>
+  )
+}
+
+// ── stock placement — where everything sits, at a glance ────────────────────
+interface PlacementSeg { key: string; label: string; units: number; cls: string }
+
+function PlacementBar({ segs, total }: { segs: PlacementSeg[]; total: number }) {
+  const pct = (u: number) => total ? (u / total) * 100 : 0
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Where the stock sits</p>
+        <p className="text-[11px] text-gray-400 tabular-nums">{formatNumber(total)} units available</p>
+      </div>
+      <div className="h-3 w-full rounded-full bg-gray-100 overflow-hidden flex">
+        {segs.filter(s => s.units > 0).map(s => (
+          <div
+            key={s.key}
+            title={`${s.label}: ${formatNumber(s.units)} units (${Math.round(pct(s.units))}%)`}
+            className={`h-full ${s.cls}`}
+            style={{ width: `${pct(s.units)}%` }}
+          />
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+        {segs.map(s => (
+          <span key={s.key} className="flex items-center gap-1.5 text-[11px] text-gray-500">
+            <span className={`w-2.5 h-2.5 rounded-sm ${s.cls}`} />
+            {s.label} <b className="text-gray-700 tabular-nums">{formatNumber(s.units)}</b>
+            <span className="text-gray-400">({Math.round(pct(s.units))}%)</span>
+          </span>
+        ))}
       </div>
     </div>
   )
@@ -77,7 +128,6 @@ function StatTile({ icon: Icon, label, value, sub }: { icon: typeof Box; label: 
 // ── rack picker tile (grid view) ─────────────────────────────────────────────
 function RackTile({ rack, roll, metric, active, onClick }: { rack: Rack; roll: RackRoll; metric: Metric; active: boolean; onClick: () => void }) {
   const pct = occupancyPct(rack, roll)
-  const bk: Exclude<FillBucket, 'empty'> = pct > 85 ? 'high' : pct > 60 ? 'mid' : 'low'
   return (
     <button
       onClick={onClick}
@@ -85,14 +135,14 @@ function RackTile({ rack, roll, metric, active, onClick }: { rack: Rack; roll: R
         active ? 'border-red-400 bg-red-50/40 ring-1 ring-red-300' : 'border-gray-100 bg-white hover:border-gray-300'
       }`}
     >
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-xs font-bold text-gray-800 font-mono">{rack.name}</span>
-        <span className="text-[10px] text-gray-500 tabular-nums">{metricValue(rack, roll, metric)}</span>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-sm font-bold text-gray-800 font-mono">{rack.name}</span>
+        <span className="text-xs font-semibold text-gray-700 tabular-nums">{metricValue(rack, roll, metric)}</span>
       </div>
-      <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
-        <div className={`h-full rounded-full ${BUCKET_BAR[bk]}`} style={{ width: `${pct}%` }} />
+      <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden mb-1">
+        <div className="h-full rounded-full bg-emerald-400" style={{ width: `${pct}%` }} />
       </div>
-      <div className="text-[9px] text-gray-400 mt-1">{roll.bins}/{rack.locations} bins</div>
+      <div className="text-[9px] text-gray-400">{roll.bins}/{rack.locations} bins · {formatNumber(roll.eans)} EANs</div>
     </button>
   )
 }
@@ -100,19 +150,23 @@ function RackTile({ rack, roll, metric, active, onClick }: { rack: Rack; roll: R
 // ── rack picker row (list view) ──────────────────────────────────────────────
 function RackRow({ rack, roll, metric, active, onClick }: { rack: Rack; roll: RackRoll; metric: Metric; active: boolean; onClick: () => void }) {
   const pct = occupancyPct(rack, roll)
-  const bk: Exclude<FillBucket, 'empty'> = pct > 85 ? 'high' : pct > 60 ? 'mid' : 'low'
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg border transition-all ${
+      className={`w-full px-2.5 py-2 rounded-lg border transition-all text-left ${
         active ? 'border-red-400 bg-red-50/40 ring-1 ring-red-300' : 'border-gray-100 bg-white hover:border-gray-300'
       }`}
     >
-      <span className="font-mono font-bold text-xs text-gray-800 w-6 text-left flex-shrink-0">{rack.name}</span>
-      <div className="flex-1 min-w-0 h-1.5 rounded-full bg-gray-100 overflow-hidden">
-        <div className={`h-full rounded-full ${BUCKET_BAR[bk]}`} style={{ width: `${pct}%` }} />
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-mono font-bold text-sm text-gray-800">{rack.name}</span>
+        <span className="text-xs font-semibold text-gray-700 tabular-nums">{metricValue(rack, roll, metric)}</span>
       </div>
-      <span className="text-[10px] font-semibold text-gray-600 tabular-nums w-12 text-right flex-shrink-0">{metricValue(rack, roll, metric)}</span>
+      <div className="flex items-center gap-2 mt-1">
+        <div className="flex-1 min-w-0 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+          <div className="h-full rounded-full bg-emerald-400" style={{ width: `${pct}%` }} />
+        </div>
+        <span className="text-[9px] text-gray-400 flex-shrink-0">{roll.bins}/{rack.locations} · {formatNumber(roll.eans)} EANs</span>
+      </div>
     </button>
   )
 }
@@ -216,10 +270,11 @@ function FocusedPanel({ rack, roll, cellMap, bucketOf, thresholds, onPick, selec
   onPick: (info: LocationInfo) => void
   selectedCode: string | null
 }) {
-  const legend: [Exclude<FillBucket, 'empty'>, string][] = [
-    ['low',  `1–${formatNumber(thresholds.t1)} units`],
-    ['mid',  `${formatNumber(thresholds.t1 + 1)}–${formatNumber(thresholds.t2)} units`],
-    ['high', `>${formatNumber(thresholds.t2)} units`],
+  const legend: [FillBucket, string][] = [
+    ['empty', 'empty'],
+    ['low',  `1–${formatNumber(thresholds.t1)}`],
+    ['mid',  `${formatNumber(thresholds.t1 + 1)}–${formatNumber(thresholds.t2)}`],
+    ['high', `${formatNumber(thresholds.t2 + 1)}+ units`],
   ]
   return (
     <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-4 min-w-0">
@@ -240,13 +295,10 @@ function FocusedPanel({ rack, roll, cellMap, bucketOf, thresholds, onPick, selec
       <FocusedGrid rack={rack} cellMap={cellMap} bucketOf={bucketOf} onPick={onPick} selectedCode={selectedCode} />
 
       <div className="flex flex-wrap items-center gap-4 mt-4 pt-3 border-t border-gray-100">
-        <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm bg-white border border-gray-200" />
-          <span className="text-[11px] text-gray-500">empty</span>
-        </div>
+        <span className="text-[11px] font-semibold text-gray-500">Units in bin — darker green = more stock:</span>
         {legend.map(([b, l]) => (
           <div key={b} className="flex items-center gap-1.5">
-            <span className={`w-3 h-3 rounded-sm ${BUCKET_BAR[b]}`} />
+            <span className={`w-3 h-3 rounded-sm ${BUCKET_SWATCH[b]}`} />
             <span className="text-[11px] text-gray-500">{l}</span>
           </div>
         ))}
@@ -439,15 +491,28 @@ export default function RacksPage() {
   const racks = useMemo(() => racksOnFloor(floor), [floor])
   const active = useMemo(() => racks.find(r => r.name === selectedRack) ?? racks[0], [racks, selectedRack])
 
-  const floorRoll = useMemo(() => {
-    const rolls = racks.map(r => rackRoll.get(r.name) ?? EMPTY_ROLL)
-    return {
-      capacity: racks.reduce((s, r) => s + r.locations, 0),
-      bins:     rolls.reduce((s, r) => s + r.bins, 0),
-      units:    rolls.reduce((s, r) => s + r.units, 0),
-      eans:     rolls.reduce((s, r) => s + r.eans, 0),
-    }
-  }, [racks, rackRoll])
+  // warehouse-wide placement summary — the "at a glance" answer
+  const placement = useMemo(() => {
+    if (!data) return null
+    const rackUnits = data.cells.reduce((s, c) => s + c.units, 0)
+    const zoneUnits = (id: string) => data.zones.find(z => z.zone === id)?.units ?? 0
+    const pallets = zoneUnits('PALLETS')
+    const cages = zoneUnits('CAGES')
+    const otherZones = data.zones
+      .filter(z => z.zone !== 'PALLETS' && z.zone !== 'CAGES')
+      .reduce((s, z) => s + z.units, 0)
+    const unracked = data.unracked?.units ?? 0
+    const total = data.totals.units
+    const segs: PlacementSeg[] = [
+      { key: 'racks',   label: 'Rack bins',   units: rackUnits,  cls: 'bg-emerald-500' },
+      { key: 'pallets', label: 'Pallets',     units: pallets,    cls: 'bg-amber-400' },
+      { key: 'cages',   label: 'Cages',       units: cages,      cls: 'bg-sky-400' },
+      { key: 'zones',   label: 'Other areas', units: otherZones, cls: 'bg-violet-400' },
+      { key: 'none',    label: 'No location', units: unracked,   cls: 'bg-red-400' },
+    ]
+    const zonesTotal = pallets + cages + otherZones
+    return { segs, total, rackUnits, zonesTotal, unracked, rackedPct: total ? Math.round((rackUnits / total) * 100) : 0 }
+  }, [data])
 
   const pickGridCell = (info: LocationInfo) => setTarget({
     code: info.code,
@@ -458,6 +523,10 @@ export default function RacksPage() {
   const pickZoneCell = (zone: ZoneStock, cell: CellStock) => setTarget({
     code: cell.code, subtitle: zone.label, cell, info: null,
   })
+  const openUnracked = () => data?.unracked && setTarget({
+    code: 'NO LOCATION', subtitle: 'Stock without a recorded rack number', cell: data.unracked, info: null,
+  })
+  const scrollToZones = () => document.getElementById('other-storage')?.scrollIntoView({ behavior: 'smooth' })
 
   return (
     <>
@@ -476,6 +545,44 @@ export default function RacksPage() {
         <div className="flex items-center gap-2 mb-4 bg-white border border-gray-100 text-gray-500 text-sm rounded-xl px-4 py-3">
           <Loader2 className="w-4 h-4 animate-spin" /> Loading live stock…
         </div>
+      )}
+
+      {/* KPI strip — total picture first, then where it sits */}
+      {data && placement && (
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+            <StatTile
+              icon={Boxes}
+              label="Available stock"
+              value={formatNumber(placement.total)}
+              sub={`${formatNumber(data.totals.eans)} EANs · live`}
+            />
+            <StatTile
+              icon={Layers}
+              label="In rack bins"
+              value={formatNumber(placement.rackUnits)}
+              sub={`${placement.rackedPct}% of stock · properly placed`}
+            />
+            <StatTile
+              icon={Box}
+              label="Other storage"
+              value={formatNumber(placement.zonesTotal)}
+              sub="pallets, cages, rooms — view below"
+              onClick={scrollToZones}
+            />
+            <StatTile
+              icon={AlertTriangle}
+              label="No location"
+              value={formatNumber(placement.unracked)}
+              sub="units without rack no. — tap to list"
+              tone="alert"
+              onClick={openUnracked}
+            />
+          </div>
+          <div className="mb-4">
+            <PlacementBar segs={placement.segs} total={placement.total} />
+          </div>
+        </>
       )}
 
       {/* Floor + view + metric toggles */}
@@ -528,18 +635,12 @@ export default function RacksPage() {
         </div>
       </div>
 
-      {/* Floor metrics strip — live figures */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <StatTile icon={Boxes} label="Capacity" value={formatNumber(floorRoll.capacity)} sub={`${racks.length} racks · bins`} />
-        <StatTile icon={Layers} label="Occupied bins" value={formatNumber(floorRoll.bins)} sub={`${floorRoll.capacity ? Math.round((floorRoll.bins / floorRoll.capacity) * 100) : 0}% of capacity`} />
-        <StatTile icon={Box} label="Units available" value={formatNumber(floorRoll.units)} sub="on this floor's racks" />
-        <StatTile icon={Barcode} label="EANs" value={formatNumber(floorRoll.eans)} sub="distinct per bin" />
-      </div>
-
       {/* Body — side rail (rack picker, list or grid) + focused rack */}
-      <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-4 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4 items-start">
         <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-3">
-          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2 px-1">Racks ({racks.length})</p>
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2 px-1">
+            Racks ({racks.length}) · {formatNumber(racks.reduce((s, r) => s + r.locations, 0))} bins
+          </p>
           {view === 'list' ? (
             <div className="flex flex-col gap-1.5">
               {racks.map(r => (
@@ -567,17 +668,14 @@ export default function RacksPage() {
 
       {/* Other storage — stock parked outside the rack grids */}
       {data && (data.zones.length > 0 || data.unracked) && (
-        <div className="mt-6">
+        <div className="mt-6" id="other-storage">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <div>
               <h2 className="text-sm font-bold text-gray-900">Other storage</h2>
               <p className="text-[11px] text-gray-400">Pallets, cages and rooms — locations outside the rack grids</p>
             </div>
             {data.unracked && (
-              <button
-                onClick={() => setTarget({ code: 'NO LOCATION', subtitle: 'Stock without a recorded rack number', cell: data.unracked, info: null })}
-                className="text-xs text-red-500 font-semibold hover:underline"
-              >
+              <button onClick={openUnracked} className="text-xs text-red-500 font-semibold hover:underline">
                 {formatNumber(data.unracked.units)} units have no location →
               </button>
             )}
