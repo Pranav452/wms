@@ -11,13 +11,17 @@ function formatDisplayDate(ymd: string): string {
   return `${parseInt(d)} ${months[parseInt(m) - 1]} ${y}`
 }
 
+function formatRange(from: string, to: string): string {
+  return from ? `${formatDisplayDate(from)} – ${formatDisplayDate(to)}` : formatDisplayDate(to)
+}
+
 interface HeaderProps {
   title: string
   breadcrumb: string
 }
 
 export default function Header({ title, breadcrumb }: HeaderProps) {
-  const { asOnDate, setAsOnDate, refresh, loading } = useDashboard()
+  const { asOnDate, setAsOnDate, fromDate, setFromDate, refresh, loading } = useDashboard()
   const { openSidebar } = useSidebar()
 
   return (
@@ -41,9 +45,26 @@ export default function Header({ title, breadcrumb }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-        {/* As-on-date picker */}
+        {/* Date-range picker — start optional ('' = all-time), end doubles as the as-on date */}
         <div className="flex items-center gap-2 bg-white rounded-xl px-3 py-2 shadow-sm border border-gray-100">
-          <span className="text-xs text-gray-500 hidden sm:block">As on:</span>
+          <span className="text-xs text-gray-500 hidden sm:block">From:</span>
+          <input
+            type="date"
+            value={fromDate}
+            max={asOnDate}
+            onChange={e => setFromDate(e.target.value)}
+            className="text-sm text-gray-800 outline-none bg-transparent cursor-pointer min-w-0 w-[7.5rem] sm:w-auto"
+          />
+          {fromDate && (
+            <button
+              onClick={() => setFromDate('')}
+              aria-label="Clear start date"
+              className="text-gray-400 hover:text-red-500 text-xs font-medium"
+            >
+              ✕
+            </button>
+          )}
+          <span className="text-xs text-gray-500 hidden sm:block">To:</span>
           <input
             type="date"
             value={asOnDate}
@@ -65,7 +86,7 @@ export default function Header({ title, breadcrumb }: HeaderProps) {
 
         {/* Display date pill */}
         <span className="hidden md:block text-xs bg-red-50 text-red-600 px-3 py-1.5 rounded-full font-medium">
-          {formatDisplayDate(asOnDate)}
+          {formatRange(fromDate, asOnDate)}
         </span>
       </div>
     </header>

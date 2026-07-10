@@ -7,9 +7,9 @@ import { ErrorState } from '@/components/shared/LoadingState'
 import { POSkeleton } from '@/components/shared/Skeleton'
 import { useDashboard } from '@/context/DashboardContext'
 import { formatNumber } from '@/lib/utils'
-import type { RS12_POTracking } from '@/types/dashboard'
+import type { RS22_STRTracking } from '@/types/dashboard'
 
-const poColumns: Column<RS12_POTracking>[] = [
+const poColumns: Column<RS22_STRTracking>[] = [
   { key: 'PONO',               header: 'PO No',        className: 'font-medium text-gray-900 text-xs' },
   { key: 'CLIENT',             header: 'Client',        className: 'text-gray-600 text-xs' },
   {
@@ -32,6 +32,17 @@ const poColumns: Column<RS12_POTracking>[] = [
     ),
   },
   {
+    key: 'STR_TO_DISPATCH_DAYS',
+    header: 'TAT (days)',
+    render: r => r.STR_TO_DISPATCH_DAYS != null
+      ? (
+        <span className={`text-xs font-medium ${r.STR_TO_DISPATCH_DAYS > 7 ? 'text-orange-600' : 'text-green-600'}`}>
+          {r.STR_TO_DISPATCH_DAYS}
+        </span>
+      )
+      : <span className="text-xs text-gray-300">—</span>,
+  },
+  {
     key: 'LAST_DISPATCH_DATE',
     header: 'Last Dispatched',
     render: r => r.LAST_DISPATCH_DATE
@@ -48,14 +59,15 @@ const poColumns: Column<RS12_POTracking>[] = [
 ]
 
 export default function POPage() {
-  const { data, loading, error } = useDashboard()
+  const { data, loading, error, fromDate } = useDashboard()
 
   if (loading) return <><Header title="PO Tracking" breadcrumb="PO" /><POSkeleton /></>
   if (error)   return <><Header title="PO Tracking" breadcrumb="PO" /><ErrorState message={error} /></>
   if (!data)   return null
 
-  const fullyDispatched = data.poTracking.filter(p => p.BALANCE <= 0).length
-  const pending         = data.poTracking.filter(p => p.BALANCE > 0).length
+  const rows            = data.strTracking
+  const fullyDispatched = rows.filter(p => p.BALANCE <= 0).length
+  const pending         = rows.filter(p => p.BALANCE > 0).length
   const unfulfilled     = formatNumber(data.kpi?.UNFULFILLED_PO_QTY ?? 0)
 
   return (
@@ -66,10 +78,10 @@ export default function POPage() {
         {/* Summary */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
-            { label: 'Total POs',        value: data.poTracking.length, sub: 'purchase orders' },
-            { label: 'Fully Dispatched', value: fullyDispatched,        sub: 'POs complete',     color: 'text-green-600' },
-            { label: 'Pending Dispatch', value: pending,                sub: 'POs outstanding',  color: pending > 0 ? 'text-orange-500' : 'text-gray-900' },
-            { label: 'Unfulfilled Qty',  value: unfulfilled,            sub: 'units still owed', color: 'text-red-500' },
+            { label: fromDate ? 'POs in Period' : 'Total POs', value: rows.length, sub: 'purchase orders' },
+            { label: 'Fully Dispatched', value: fullyDispatched, sub: 'POs complete',    color: 'text-green-600' },
+            { label: 'Pending Dispatch', value: pending,         sub: 'POs outstanding', color: pending > 0 ? 'text-orange-500' : 'text-gray-900' },
+            { label: 'Unfulfilled Qty',  value: unfulfilled,     sub: 'units still owed', color: 'text-red-500' },
           ].map(c => (
             <div key={c.label} className="bg-white rounded-2xl p-4 shadow-sm">
               <p className="text-xs text-gray-500 mb-1">{c.label}</p>
@@ -81,15 +93,16 @@ export default function POPage() {
 
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800">
           <strong>Tip:</strong> Search by PO number (e.g.{' '}
-          <span className="font-mono">STNITFABP230426-10</span>) — the{' '}
-          <span className="font-mono">GIN Ref</span> column shows the linked dispatch note.
+          <span className="font-mono">STNITFABP230426-10</span>) — <span className="font-mono">STR Created</span> is
+          the date the STR file was shared with MP Cargo, and <span className="font-mono">TAT</span> counts
+          days from STR creation to first dispatch.
         </div>
 
         <DataTable
-          data={data.poTracking as unknown as Record<string, unknown>[]}
+          data={rows as unknown as Record<string, unknown>[]}
           columns={poColumns as unknown as Column<Record<string, unknown>>[]}
           filterKeys={['PONO', 'CLIENT'] as never[]}
-          title={`PO Tracking (${data.poTracking.length} orders)`}
+          title={`PO Tracking (${rows.length} orders)`}
           pageSize={25}
         />
       </div>

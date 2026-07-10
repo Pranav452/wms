@@ -152,6 +152,71 @@ export interface RS20_POValue {
   TOTAL_LANDED:     number
 }
 
+export interface RS21_RangeKPI {
+  STR_COUNT:            number
+  GRN_QTY:              number
+  DISPATCH_QTY:         number
+  GIN_COUNT:            number
+  RETURN_QTY:           number
+  RO_COUNT:             number
+  GRTN_COUNT:           number
+  RETURN_USABLE_QTY:    number
+  RETURN_NONUSABLE_QTY: number
+}
+
+export interface RS22_STRTracking {
+  PONO:                 string
+  CLIENT:               string
+  STR_CREATION_DATE:    string
+  PO_QTY:               number
+  SKU_COUNT:            number
+  DISPATCHED:           number
+  DISPATCHED_IN_RANGE:  number
+  BALANCE:              number
+  FIRST_DISPATCH_DATE:  string
+  LAST_DISPATCH_DATE:   string
+  STR_TO_DISPATCH_DAYS: number | null
+  GIN_NOS:              string
+}
+
+export interface RS23_RTVSummary {
+  GRTNNO:        string
+  RETURNNO:      string
+  CLIENTINVNO:   string
+  RECEIVED_DATE: string
+  ENTRY_DATE:    string
+  SOURCE:        string
+  SKU_COUNT:     number
+  QTY_ISSUED:    number
+  QTY_RECEIVED:  number
+  MISSING_QTY:   number
+  USABLE_QTY:    number
+  NONUSABLE_QTY: number
+  RETURN_TYPES:  string
+}
+
+export interface RS24_RTVDetail {
+  GRTNNO:        string
+  RETURNNO:      string
+  RECEIVED_DATE: string
+  EAN:           string
+  SKU:           string
+  ITEMNAME:      string
+  RETURN_QTY:    number
+  CONDITION_:    string
+  RETURN_TYPE:   string
+  CONTAINERNO:   string
+  BOXNO:         string
+}
+
+export interface RS25_DailyFlow {
+  FLOW_DATE:    string
+  FLOW_SORT:    string
+  RECEIPT_QTY:  number
+  DISPATCH_QTY: number
+  RETURN_QTY:   number
+}
+
 export interface DashboardData {
   kpi:                RS1_KPI | null
   shipTypes:          RS2_ShipType[]
@@ -173,6 +238,12 @@ export interface DashboardData {
   deliveryAgents:     RS18_DeliveryAgent[]
   grnDaily:           RS19_GRNDaily[]
   poValue:            RS20_POValue[]
+  rangeKpi:           RS21_RangeKPI | null
+  strTracking:        RS22_STRTracking[]
+  rtvSummary:         RS23_RTVSummary[]
+  rtvDetail:          RS24_RTVDetail[]
+  dailyFlow:          RS25_DailyFlow[]
   asOnDate:           string
+  fromDate:           string
   fetchedAt:          string
 }

@@ -8,6 +8,7 @@ export async function GET(req: NextRequest) {
   const citycode = searchParams.get('citycode') || 'MUM'
   const today    = new Date().toLocaleDateString('en-GB')
   const asondate = searchParams.get('asondate') || today
+  const fromdate = searchParams.get('fromdate') || ''
 
   try {
     const pool    = await getPool()
@@ -15,6 +16,7 @@ export async function GET(req: NextRequest) {
     request.input('CMPCODE',  sql.VarChar(2),  cmpcode)
     request.input('CITYCODE', sql.VarChar(3),  citycode)
     request.input('ASONDATE', sql.VarChar(10), asondate)
+    request.input('FROMDATE', sql.VarChar(10), fromdate)
 
     const result = await request.execute('USP_WMS_DASHBOARD_V3')
     const rs     = result.recordsets as unknown[][]
@@ -40,7 +42,13 @@ export async function GET(req: NextRequest) {
       deliveryAgents:         (rs[17] ?? [])        as DashboardData['deliveryAgents'],
       grnDaily:               (rs[18] ?? [])        as DashboardData['grnDaily'],
       poValue:                (rs[19] ?? [])        as DashboardData['poValue'],
+      rangeKpi:               (rs[20]?.[0] ?? null) as DashboardData['rangeKpi'],
+      strTracking:            (rs[21] ?? [])        as DashboardData['strTracking'],
+      rtvSummary:             (rs[22] ?? [])        as DashboardData['rtvSummary'],
+      rtvDetail:              (rs[23] ?? [])        as DashboardData['rtvDetail'],
+      dailyFlow:              (rs[24] ?? [])        as DashboardData['dailyFlow'],
       asOnDate:               asondate,
+      fromDate:               fromdate,
       fetchedAt:              new Date().toISOString(),
     }
 

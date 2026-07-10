@@ -15,6 +15,7 @@ import {
   Warehouse,
   Boxes,
   ChevronDown,
+  RotateCcw,
   X,
 } from 'lucide-react'
 
@@ -39,6 +40,7 @@ const NAV_ITEMS: NavEntry[] = [
   { href: '/grn',        icon: TrendingUp, label: 'GRN & Trends' },
   { href: '/mrp',        icon: Tag,        label: 'MRP / Labels' },
   { href: '/po',         icon: FileText,   label: 'PO Tracking' },
+  { href: '/rtv',        icon: RotateCcw,  label: 'RTV Returns' },
 ]
 
 function isGroup(e: NavEntry): e is NavGroupItem {

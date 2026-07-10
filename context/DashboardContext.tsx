@@ -8,8 +8,10 @@ interface DashboardCtx {
   data:        DashboardData | null
   loading:     boolean
   error:       string | null
-  asOnDate:    string           // yyyy-MM-dd (for <input type="date">)
+  asOnDate:    string           // yyyy-MM-dd (for <input type="date">) — end of window / as-on
   setAsOnDate: (d: string) => void
+  fromDate:    string           // yyyy-MM-dd, '' = all-time — start of window (flow reports only)
+  setFromDate: (d: string) => void
   refresh:     () => void
 }
 
@@ -17,6 +19,7 @@ const Ctx = createContext<DashboardCtx | null>(null)
 
 export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [asOnDate, setAsOnDate] = useState(todayYMD)
+  const [fromDate, setFromDate] = useState('')
   const [data, setData]         = useState<DashboardData | null>(null)
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState<string | null>(null)
@@ -29,8 +32,10 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     setLoading(true)
     setError(null)
 
-    const spDate = toSPDate(asOnDate)
-    fetch(`/api/dashboard?asondate=${encodeURIComponent(spDate)}`)
+    const spDate   = toSPDate(asOnDate)
+    const spFrom   = fromDate ? toSPDate(fromDate) : ''
+    const fromPart = spFrom ? `&fromdate=${encodeURIComponent(spFrom)}` : ''
+    fetch(`/api/dashboard?asondate=${encodeURIComponent(spDate)}${fromPart}`)
       .then(r => {
         if (!r.ok) return r.json().then((j: { error?: string }) => Promise.reject(j.error || 'Request failed'))
         return r.json() as Promise<DashboardData>
@@ -43,10 +48,10 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       })
 
     return () => { cancelled = true }
-  }, [asOnDate, tick])
+  }, [asOnDate, fromDate, tick])
 
   return (
-    <Ctx.Provider value={{ data, loading, error, asOnDate, setAsOnDate, refresh }}>
+    <Ctx.Provider value={{ data, loading, error, asOnDate, setAsOnDate, fromDate, setFromDate, refresh }}>
       {children}
     </Ctx.Provider>
   )
