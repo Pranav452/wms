@@ -11,6 +11,7 @@ import {
   colLetter,
   shelfNumber,
   POSITIONS_PER_SHELF,
+  type Floor,
   type FloorId,
   type Rack,
   type LocationInfo,
@@ -93,6 +94,53 @@ function StatTile({ icon: Icon, label, value, sub, tone = 'default', onClick }: 
         {sub && <p className="text-[10px] text-gray-400 leading-none">{sub}</p>}
       </div>
     </Tag>
+  )
+}
+
+// ── per-floor rack consumption — racks used, bins consumed, qty stored ──────
+interface FloorSummary {
+  floor: Floor
+  racksUsed: number
+  racksTotal: number
+  bins: number
+  capacity: number
+  units: number
+  eans: number
+}
+
+function FloorCard({ s, active, onClick }: { s: FloorSummary; active: boolean; onClick: () => void }) {
+  const pct = s.capacity ? Math.min(100, Math.round((s.bins / s.capacity) * 100)) : 0
+  return (
+    <button
+      onClick={onClick}
+      className={`text-left rounded-2xl border shadow-sm px-4 py-3 w-full transition-colors ${
+        active ? 'border-red-400 bg-red-50/40 ring-1 ring-red-300' : 'bg-white border-gray-100 hover:border-gray-300'
+      }`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md ${
+            active ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-500'
+          }`}>{s.floor.short}</span>
+          <span className="text-sm font-bold text-gray-900 truncate">{s.floor.label} racks</span>
+        </div>
+        <div className="text-right flex-shrink-0">
+          <p className="text-lg font-bold text-gray-900 tabular-nums leading-tight">{formatNumber(s.units)}</p>
+          <p className="text-[10px] text-gray-400 leading-none">units stored</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 mt-2">
+        <div className="flex-1 min-w-0 h-2 rounded-full bg-gray-100 overflow-hidden">
+          <div className="h-full rounded-full bg-emerald-500" style={{ width: `${pct}%` }} />
+        </div>
+        <span className="text-xs font-semibold text-gray-700 tabular-nums flex-shrink-0">{pct}%</span>
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5 text-[11px] text-gray-500">
+        <span>Racks in use <b className="text-gray-700 tabular-nums">{s.racksUsed}/{s.racksTotal}</b></span>
+        <span>Bins consumed <b className="text-gray-700 tabular-nums">{formatNumber(s.bins)}/{formatNumber(s.capacity)}</b></span>
+        <span>EANs <b className="text-gray-700 tabular-nums">{formatNumber(s.eans)}</b></span>
+      </div>
+    </button>
   )
 }
 
@@ -498,6 +546,24 @@ export default function RacksPage() {
 
   const bucketer = useMemo(() => makeBucketer(data ? data.cells.map(c => c.units) : []), [data])
 
+  // per-floor consumption: racks in use, bins consumed vs capacity, qty stored
+  const floorSummary = useMemo<FloorSummary[] | null>(() => {
+    if (!data) return null
+    return FLOORS.map(f => {
+      const s: FloorSummary = { floor: f, racksUsed: 0, racksTotal: 0, bins: 0, capacity: 0, units: 0, eans: 0 }
+      racksOnFloor(f.id).forEach(r => {
+        const roll = rackRoll.get(r.name) ?? EMPTY_ROLL
+        s.racksTotal += 1
+        if (roll.bins > 0) s.racksUsed += 1
+        s.bins += roll.bins
+        s.capacity += rackCapacity(r, roll)
+        s.units += roll.units
+        s.eans += roll.eans
+      })
+      return s
+    })
+  }, [data, rackRoll])
+
   const racks = useMemo(() => racksOnFloor(floor), [floor])
   const active = useMemo(() => racks.find(r => r.name === selectedRack) ?? racks[0], [racks, selectedRack])
 
@@ -589,10 +655,24 @@ export default function RacksPage() {
               onClick={openUnracked}
             />
           </div>
-          <div className="mb-4">
+          <div className="mb-3">
             <PlacementBar segs={placement.segs} total={placement.total} />
           </div>
         </>
+      )}
+
+      {/* Per-floor rack consumption — the meeting ask: racks used + qty per floor */}
+      {floorSummary && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+          {floorSummary.map(s => (
+            <FloorCard
+              key={s.floor.id}
+              s={s}
+              active={floor === s.floor.id}
+              onClick={() => { setFloor(s.floor.id); setSelectedRack(null) }}
+            />
+          ))}
+        </div>
       )}
 
       {/* Floor + view + metric toggles */}
