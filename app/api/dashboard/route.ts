@@ -47,6 +47,7 @@ export async function GET(req: NextRequest) {
       rtvSummary:             (rs[22] ?? [])        as DashboardData['rtvSummary'],
       rtvDetail:              (rs[23] ?? [])        as DashboardData['rtvDetail'],
       dailyFlow:              (rs[24] ?? [])        as DashboardData['dailyFlow'],
+      mrpMismatch:            (rs[25] ?? [])        as DashboardData['mrpMismatch'],
       asOnDate:               asondate,
       fromDate:               fromdate,
       fetchedAt:              new Date().toISOString(),

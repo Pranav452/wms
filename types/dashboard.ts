@@ -86,6 +86,7 @@ export interface RS12_POTracking {
   DISPATCHED:        number
   BALANCE:           number
   SKU_COUNT:         number
+  MRP_MISMATCH_COUNT: number
   LAST_DISPATCH_DATE: string
   GIN_NOS:           string
 }
@@ -165,6 +166,8 @@ export interface RS21_RangeKPI {
   RETURN_NONUSABLE_QTY: number
   CONTAINER_COUNT:      number
   SKU_COUNT:            number
+  MRP_MISMATCH_EAN_COUNT: number  // whole-warehouse, not affected by date-range filter
+  MRP_MISMATCH_PO_COUNT:  number  // whole-warehouse, not affected by date-range filter
 }
 
 export interface RS22_STRTracking {
@@ -179,6 +182,7 @@ export interface RS22_STRTracking {
   FIRST_DISPATCH_DATE:  string
   LAST_DISPATCH_DATE:   string
   STR_TO_DISPATCH_DAYS: number | null
+  MRP_MISMATCH_COUNT:   number
   GIN_NOS:              string
 }
 
@@ -220,6 +224,18 @@ export interface RS25_DailyFlow {
   RETURN_QTY:   number
 }
 
+// PO MRP doesn't match any printed label MRP for that EAN (no printed label also counts)
+export interface RS26_MrpMismatch {
+  PONO:                    string
+  'Vendor Article Code':   string
+  SKU:                     string
+  EAN:                     string
+  'Item Name':             string
+  'PO MRP':                string
+  'WMS Label MRP':         string  // comma-joined printed label prices; '' = no label printed yet
+  'Balance Qty':           number
+}
+
 export interface DashboardData {
   kpi:                RS1_KPI | null
   shipTypes:          RS2_ShipType[]
@@ -246,6 +262,7 @@ export interface DashboardData {
   rtvSummary:         RS23_RTVSummary[]
   rtvDetail:          RS24_RTVDetail[]
   dailyFlow:          RS25_DailyFlow[]
+  mrpMismatch:        RS26_MrpMismatch[]
   asOnDate:           string
   fromDate:           string
   fetchedAt:          string

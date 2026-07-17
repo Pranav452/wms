@@ -20,6 +20,17 @@ const poColumns: Column<RS22_STRTracking>[] = [
       : <span className="text-xs text-gray-300">—</span>,
   },
   { key: 'SKU_COUNT',          header: 'SKUs',          render: r => formatNumber(r.SKU_COUNT) },
+  {
+    key: 'MRP_MISMATCH_COUNT',
+    header: 'MRP Mismatch',
+    render: r => r.MRP_MISMATCH_COUNT > 0
+      ? (
+        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-700">
+          {formatNumber(r.MRP_MISMATCH_COUNT)}
+        </span>
+      )
+      : <span className="text-xs text-gray-300">0</span>,
+  },
   { key: 'PO_QTY',             header: 'PO Qty',        render: r => formatNumber(r.PO_QTY) },
   { key: 'DISPATCHED',         header: 'Dispatched',    render: r => formatNumber(r.DISPATCHED) },
   {
