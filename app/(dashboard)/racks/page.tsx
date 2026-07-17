@@ -184,7 +184,7 @@ function RackTile({ rack, roll, metric, active, onClick }: { rack: Rack; roll: R
   return (
     <button
       onClick={onClick}
-      className={`text-left rounded-xl border p-2.5 transition-all ${
+      className={`w-full text-left rounded-xl border p-2.5 transition-all ${
         active ? 'border-red-400 bg-red-50/40 ring-1 ring-red-300' : 'border-gray-100 bg-white hover:border-gray-300'
       }`}
     >
@@ -195,7 +195,7 @@ function RackTile({ rack, roll, metric, active, onClick }: { rack: Rack; roll: R
       <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden mb-1">
         <div className="h-full rounded-full bg-emerald-400" style={{ width: `${pct}%` }} />
       </div>
-      <div className="text-[9px] text-gray-400">{roll.bins}/{rackCapacity(rack, roll)} bins · {formatNumber(roll.eans)} EANs</div>
+      <div className="text-[9px] text-gray-400 truncate">{roll.bins}/{rackCapacity(rack, roll)} bins · {formatNumber(roll.eans)} EANs</div>
     </button>
   )
 }
@@ -218,7 +218,7 @@ function RackRow({ rack, roll, metric, active, onClick }: { rack: Rack; roll: Ra
         <div className="flex-1 min-w-0 h-1.5 rounded-full bg-gray-100 overflow-hidden">
           <div className="h-full rounded-full bg-emerald-400" style={{ width: `${pct}%` }} />
         </div>
-        <span className="text-[9px] text-gray-400 flex-shrink-0">{roll.bins}/{rackCapacity(rack, roll)} · {formatNumber(roll.eans)} EANs</span>
+        <span className="text-[9px] text-gray-400 flex-shrink-0 whitespace-nowrap">{roll.bins}/{rackCapacity(rack, roll)} · {formatNumber(roll.eans)} EANs</span>
       </div>
     </button>
   )
@@ -260,7 +260,8 @@ function FocusedGrid({ rack, cellMap, bucketOf, onPick, selectedCode }: {
 
   return (
     <div className="overflow-x-auto pb-1">
-      <div className="min-w-[520px] flex flex-col gap-2">
+      {/* min width scales with bin count so ground-floor racks stay readable and scroll on phones */}
+      <div className="flex flex-col gap-2" style={{ minWidth: rack.cols * 52 + 28 }}>
         {/* header: bay label + bin position letters */}
         <div className="flex items-end gap-2.5">
           <div className="w-7 flex-shrink-0" />
@@ -693,54 +694,63 @@ export default function RacksPage() {
 
         <div className="flex-1" />
 
-        {/* List / Grid view toggle */}
-        <div className="inline-flex rounded-xl bg-white border border-gray-100 shadow-sm p-1">
-          {(['list', 'grid'] as View[]).map(v => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1.5 transition-colors ${
-                view === v ? 'bg-gray-50 text-gray-900 font-medium shadow-sm' : 'text-gray-400 hover:text-gray-700'
-              }`}
-            >
-              {v === 'list' ? <ListIcon className="w-4 h-4" /> : <LayoutGrid className="w-4 h-4" />}
-              <span className="capitalize">{v}</span>
-            </button>
-          ))}
-        </div>
+        {/* View + metric toggles wrap together on small screens */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* List / Grid view toggle — picker is always a strip on mobile, so desktop only */}
+          <div className="hidden lg:inline-flex rounded-xl bg-white border border-gray-100 shadow-sm p-1">
+            {(['list', 'grid'] as View[]).map(v => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1.5 transition-colors ${
+                  view === v ? 'bg-gray-50 text-gray-900 font-medium shadow-sm' : 'text-gray-400 hover:text-gray-700'
+                }`}
+              >
+                {v === 'list' ? <ListIcon className="w-4 h-4" /> : <LayoutGrid className="w-4 h-4" />}
+                <span className="capitalize">{v}</span>
+              </button>
+            ))}
+          </div>
 
-        {/* Metric toggle */}
-        <div className="inline-flex rounded-xl bg-white border border-gray-100 shadow-sm p-1">
-          {METRICS.map(m => (
-            <button
-              key={m.id}
-              onClick={() => setMetric(m.id)}
-              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                metric === m.id ? 'bg-gray-50 text-gray-900 font-medium shadow-sm' : 'text-gray-400 hover:text-gray-700'
-              }`}
-            >
-              {m.label}
-            </button>
-          ))}
+          {/* Metric toggle */}
+          <div className="inline-flex rounded-xl bg-white border border-gray-100 shadow-sm p-1">
+            {METRICS.map(m => (
+              <button
+                key={m.id}
+                onClick={() => setMetric(m.id)}
+                className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                  metric === m.id ? 'bg-gray-50 text-gray-900 font-medium shadow-sm' : 'text-gray-400 hover:text-gray-700'
+                }`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Body — side rail (rack picker, list or grid) + focused rack */}
+      {/* Body — side rail (rack picker, list or grid) + focused rack.
+          On mobile the picker collapses to a horizontal swipe strip so the
+          rack grid stays above the fold. */}
       <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4 items-start">
-        <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-3">
+        <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-3 min-w-0">
           <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2 px-1">
             Racks ({racks.length}) · {formatNumber(racks.reduce((s, r) => s + r.locations, 0))} bins
           </p>
           {view === 'list' ? (
-            <div className="flex flex-col gap-1.5">
+            <div className="flex lg:flex-col gap-1.5 overflow-x-auto lg:overflow-x-visible snap-x pb-1 lg:pb-0">
               {racks.map(r => (
-                <RackRow key={r.name} rack={r} roll={rackRoll.get(r.name) ?? EMPTY_ROLL} metric={metric} active={r.name === active.name} onClick={() => setSelectedRack(r.name)} />
+                <div key={r.name} className="w-[190px] lg:w-auto flex-shrink-0 lg:flex-shrink snap-start">
+                  <RackRow rack={r} roll={rackRoll.get(r.name) ?? EMPTY_ROLL} metric={metric} active={r.name === active.name} onClick={() => setSelectedRack(r.name)} />
+                </div>
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-3 lg:grid-cols-2 gap-2">
+            <div className="flex lg:grid lg:grid-cols-2 gap-2 overflow-x-auto lg:overflow-x-visible snap-x pb-1 lg:pb-0">
               {racks.map(r => (
-                <RackTile key={r.name} rack={r} roll={rackRoll.get(r.name) ?? EMPTY_ROLL} metric={metric} active={r.name === active.name} onClick={() => setSelectedRack(r.name)} />
+                <div key={r.name} className="w-[150px] lg:w-auto flex-shrink-0 lg:flex-shrink snap-start">
+                  <RackTile rack={r} roll={rackRoll.get(r.name) ?? EMPTY_ROLL} metric={metric} active={r.name === active.name} onClick={() => setSelectedRack(r.name)} />
+                </div>
               ))}
             </div>
           )}
