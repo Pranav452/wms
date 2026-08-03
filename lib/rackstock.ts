@@ -4,8 +4,10 @@
 //   First floor  (racks A–P):  <Rack><Shelf 01-55><Side A|B|C>   e.g. "H24A"
 //     Shelf numbers are sequential per rack (max = bays × levels, verified
 //     against every rack's geometry). A few shelves have a third bin "C".
-//   Ground floor (racks GA–GN): <Rack><Level 01-11><Position A..> e.g. "GB01A"
-//     Same scheme locationCode() already renders.
+//   Ground floor (racks GA–GN): <Rack><Level 01-10><Position A..> e.g. "GB01A"
+//     Same scheme locationCode() already renders. Level 11 is out of the grid
+//     (not used for storage) — a code like "GA11A" lands in "unracked", where
+//     it stays visible rather than silently disappearing.
 //   Zones (no rack grid): PLT* pallets, CAG*/CAGE* cages, CSD*, ROOM*, BOX*,
 //     WL*, plus assorted junk ("." / "K3" / "AB34 F73") → OTHER.
 //

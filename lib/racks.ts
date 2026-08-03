@@ -4,17 +4,19 @@
 // The warehouse has TWO floors, each with its OWN rack set:
 //
 //   First Floor  — 16 racks (A–P)   →  832 shelves / 1664 locations
-//   Ground Floor — 14 racks (GA–GN) → 1188 shelves / 2376 locations
+//   Ground Floor — 14 racks (GA–GN) → 1080 shelves / 2160 locations
+//     (10 usable levels — level 11 is physically there but never stocked)
 //   ──────────────────────────────────────────────────────────────
-//   Warehouse total                 → 2020 shelves / 4040 locations
+//   Warehouse total                 → 1912 shelves / 3824 locations
 //
 // Every shelf = 2 side-by-side storage positions, so the addressable unit is
 // the LOCATION (= 2 × shelves). The grid renders one cell per location:
 // columns = bays × 2, rows = levels.
 //
 // Geometry (bays × levels) is derived from the per-rack shelf counts and the
-// 2024 KIABI email; it factors exactly. 11 levels everywhere except Rack I
-// (8 levels). Confirm if any rack's real shape differs — only the
+// 2024 KIABI email; it factors exactly. First floor: 11 levels everywhere
+// except Rack I (8 levels). Ground floor: 10 usable levels (see below).
+// Confirm if any rack's real shape differs — only the
 // [name, bays, levels] rows below need editing.
 
 export type FloorId = 'first' | 'ground'
@@ -51,10 +53,12 @@ const FIRST_FLOOR: [string, number, number][] = [
 ]
 
 const GROUND_FLOOR: [string, number, number][] = [
-  ['GA', 8, 11], ['GB', 6, 11], ['GC', 8, 11], ['GD', 8, 11],
-  ['GE', 8, 11], ['GF', 8, 11], ['GG', 8, 11], ['GH', 8, 11],
-  ['GI', 6, 11], ['GJ', 8, 11], ['GK', 8, 11], ['GL', 8, 11],
-  ['GM', 8, 11], ['GN', 8, 11],
+  // Level 11 exists physically but is NOT used for storage, so it is excluded
+  // from the grid and from capacity (verified: zero stock in level-11 bins).
+  ['GA', 8, 10], ['GB', 6, 10], ['GC', 8, 10], ['GD', 8, 10],
+  ['GE', 8, 10], ['GF', 8, 10], ['GG', 8, 10], ['GH', 8, 10],
+  ['GI', 6, 10], ['GJ', 8, 10], ['GK', 8, 10], ['GL', 8, 10],
+  ['GM', 8, 10], ['GN', 8, 10],
 ]
 
 function build(rows: [string, number, number][], floor: FloorId): Rack[] {
@@ -84,8 +88,8 @@ export function floorTotals(floor: FloorId): FloorTotals {
 }
 
 const _all = RACKS.reduce((s, r) => s + r.shelves, 0)
-export const TOTAL_SHELVES = _all                                 // 2020
-export const TOTAL_LOCATIONS = _all * POSITIONS_PER_SHELF         // 4040
+export const TOTAL_SHELVES = _all                                 // 1912
+export const TOTAL_LOCATIONS = _all * POSITIONS_PER_SHELF         // 3824
 
 // Column index (0-based) → letter: 0 → 'A', 1 → 'B'…  (positions run A, B, C…)
 export function colLetter(i: number): string {
