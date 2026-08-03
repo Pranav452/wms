@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# kiabi report: generated deck + image cache (photos and scripts are tracked)
+scripts/kiabi-report/out/
+scripts/kiabi-report/build/
