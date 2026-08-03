@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { X, PackageSearch, Boxes, Layers, Box, List as ListIcon, LayoutGrid, Loader2, AlertTriangle, RefreshCw } from 'lucide-react'
+import { X, PackageSearch, Boxes, Layers, Box, List as ListIcon, LayoutGrid, Loader2, AlertTriangle, RefreshCw, Download } from 'lucide-react'
 import Header from '@/components/layout/Header'
 import {
   FLOORS,
@@ -378,6 +378,93 @@ export interface DrawerTarget {
   subtitle: string
   cell: CellStock | null
   info: LocationInfo | null
+  unlocated?: boolean // stock with no rack number — offers the full Excel export
+}
+
+// ── Excel export of the no-location list ────────────────────────────────────
+// The drawer only shows EAN + qty; the sheet carries the whole receipt trail
+// (GRN, container, PO, who keyed it, days pending, last known rack) plus a
+// plain-English reason, so put-away can be chased without opening the ERP.
+function UnlocatedExport() {
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  async function download() {
+    if (busy) return
+    setBusy(true); setErr(null)
+    try {
+      const res = await fetch('/api/racks/unlocated')
+      const json = await res.json()
+      if (json.error) throw new Error(json.error)
+      const rows = (json.rows ?? []) as Record<string, unknown>[]
+      if (rows.length === 0) throw new Error('Nothing to export')
+
+      const date = (v: unknown) => (v ? String(v).slice(0, 10) : '')
+      const dt = (v: unknown) => (v ? String(v).replace('T', ' ').slice(0, 16) : '')
+      const sheet = rows.map((r, i) => ({
+        '#': i + 1,
+        'EAN': r.ean,
+        'SKU': r.sku,
+        'Item code': r.itemCode,
+        'Item name': r.itemName,
+        'Size': r.size,
+        'Colour': r.color,
+        'Origin': r.origin,
+        'Container': r.containerNo,
+        'Available qty': r.avail,
+        'Received': r.recd,
+        'Issued': r.iss,
+        'Returned': r.rtn,
+        'Stock col. (ERP)': r.storedStock,
+        'Rack value stored': r.rackNoRaw ?? '',
+        'Why no location': r.reason,
+        'Last known rack': r.lastRack ?? '',
+        'Last rack set on': date(r.lastRackAt),
+        'Last rack set by': r.lastRackUser ?? '',
+        'GRN no': r.grnNo,
+        'GRN date': date(r.grnDate),
+        'Days since GRN': r.daysSinceGrn,
+        'GRN order no': r.grnOrderNo,
+        'GRN box no': r.grnBoxNo,
+        'GRN rack on doc': r.grnRack ?? r.grnHdrRack ?? '',
+        'Shipment type': r.grnShipType,
+        'GRN type': r.grnType,
+        'GRN keyed by': r.grnUser,
+        'GRN keyed at': dt(r.grnEnteredAt),
+        'GRN entry IP': r.grnUserIp,
+        'PO no': r.poNo,
+        'Supplier': r.supplier,
+      }))
+
+      const XLSX = await import('xlsx')
+      const ws = XLSX.utils.json_to_sheet(sheet)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'No location')
+      const stamp = new Date().toLocaleDateString('en-CA') // local yyyy-mm-dd
+      XLSX.writeFile(wb, `no-location-stock-${stamp}.xlsx`)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/70">
+      <button
+        onClick={download}
+        disabled={busy}
+        className="w-full flex items-center justify-center gap-2 rounded-xl bg-red-500 text-white text-sm font-semibold px-4 py-2.5 hover:bg-red-600 disabled:opacity-60 transition-colors"
+      >
+        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+        {busy ? 'Building sheet…' : 'Download Excel — full detail'}
+      </button>
+      <p className="text-[11px] text-gray-400 mt-1.5 text-center">
+        Every line with its GRN, container, PO, age and the reason no rack is set.
+      </p>
+      {err && <p className="text-[11px] text-red-600 mt-1 text-center">Export failed: {err}</p>}
+    </div>
+  )
 }
 
 function LocationDrawer({ target, onClose }: { target: DrawerTarget; onClose: () => void }) {
@@ -403,6 +490,8 @@ function LocationDrawer({ target, onClose }: { target: DrawerTarget; onClose: ()
             </button>
           </div>
         </div>
+
+        {target.unlocated && <UnlocatedExport />}
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">
@@ -601,7 +690,7 @@ export default function RacksPage() {
     code: cell.code, subtitle: zone.label, cell, info: null,
   })
   const openUnracked = () => data?.unracked && setTarget({
-    code: 'NO LOCATION', subtitle: 'Stock without a recorded rack number', cell: data.unracked, info: null,
+    code: 'NO LOCATION', subtitle: 'Stock without a recorded rack number', cell: data.unracked, info: null, unlocated: true,
   })
   const scrollToZones = () => document.getElementById('other-storage')?.scrollIntoView({ behavior: 'smooth' })
 
