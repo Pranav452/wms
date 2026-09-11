@@ -37,6 +37,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     const fromPart = spFrom ? `&fromdate=${encodeURIComponent(spFrom)}` : ''
     fetch(`/api/dashboard?asondate=${encodeURIComponent(spDate)}${fromPart}`)
       .then(r => {
+        if (r.status === 401) {
+          // session expired while the tab was open — go back through sign-in
+          window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname)}`)
+          return Promise.reject('Session expired — redirecting to sign in…')
+        }
         if (!r.ok) return r.json().then((j: { error?: string }) => Promise.reject(j.error || 'Request failed'))
         return r.json() as Promise<DashboardData>
       })

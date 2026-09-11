@@ -16,8 +16,11 @@ import {
   Boxes,
   ChevronDown,
   RotateCcw,
+  LogOut,
   X,
 } from 'lucide-react'
+import { logout } from '@/app/actions/auth'
+import type { SessionUser } from '@/types/auth'
 
 interface NavLeaf {
   href: string
@@ -47,9 +50,18 @@ function isGroup(e: NavEntry): e is NavGroupItem {
   return (e as NavGroupItem).children !== undefined
 }
 
+// "Ravi Kumar Shah" -> "RS"
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  const first = parts[0]?.[0] ?? ''
+  const last  = parts.length > 1 ? parts[parts.length - 1][0] : ''
+  return (first + last).toUpperCase() || '?'
+}
+
 interface SidebarProps {
   open: boolean
   onClose: () => void
+  user: SessionUser
 }
 
 // Label that is always visible in the mobile drawer, and fades in on
@@ -125,7 +137,7 @@ function NavGroup({ item, onClose }: { item: NavGroupItem; onClose: () => void }
   )
 }
 
-export default function Sidebar({ open, onClose }: SidebarProps) {
+export default function Sidebar({ open, onClose, user }: SidebarProps) {
   return (
     <>
       {/* Backdrop — mobile only */}
@@ -174,14 +186,17 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
             </button>
           </div>
 
-          {/* User stub */}
-          <div className="flex items-center gap-3 bg-gray-50 p-2 lg:p-1 lg:group-hover/nav:p-2 transition-[padding] duration-200 rounded-xl mb-8 border border-gray-100">
+          {/* Signed-in user */}
+          <div
+            title={user.name}
+            className="flex items-center gap-3 bg-gray-50 p-2 lg:p-1 lg:group-hover/nav:p-2 transition-[padding] duration-200 rounded-xl mb-8 border border-gray-100"
+          >
             <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-sm flex-shrink-0">
-              BW
+              {initials(user.name)}
             </div>
             <div className="min-w-0 lg:opacity-0 lg:group-hover/nav:opacity-100 transition-opacity duration-150 lg:group-hover/nav:delay-75">
-              <p className="text-sm font-semibold text-gray-900 truncate whitespace-nowrap">Bridge WMS</p>
-              <p className="text-xs text-gray-500 whitespace-nowrap">Admin</p>
+              <p className="text-sm font-semibold text-gray-900 truncate whitespace-nowrap">{user.name}</p>
+              <p className="text-xs text-gray-500 truncate whitespace-nowrap">@{user.username}</p>
             </div>
           </div>
 
@@ -208,6 +223,16 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
               <Settings className="w-5 h-5 text-gray-400 flex-shrink-0" />
               <RailLabel>Settings</RailLabel>
             </Link>
+            <form action={logout}>
+              <button
+                type="submit"
+                title="Sign out"
+                className="w-full flex items-center gap-3 px-3 py-3 lg:py-2.5 rounded-lg text-sm text-gray-500 hover:bg-red-50 hover:text-red-500 transition-colors"
+              >
+                <LogOut className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                <RailLabel>Sign out</RailLabel>
+              </button>
+            </form>
           </div>
 
           {/* Info card — hidden while the rail is collapsed */}

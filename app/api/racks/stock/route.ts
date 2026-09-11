@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPool, sql } from '@/lib/db'
 import { buildRackStock, type RawStockRow } from '@/lib/rackstock'
+import { getSession } from '@/lib/auth/session'
 
 // Available qty is COMPUTED the way the ERP does it (GRN − issued + returned
 // per EAN + container). The table's currentstock column has drifted on ~780
@@ -35,6 +36,8 @@ WHERE S.Cmpcode = @CMPCODE AND S.Citycode = @CITYCODE
   AND ISNULL(G.QTY, 0) - ISNULL(I.QTY, 0) + ISNULL(R.QTY, 0) > 0`
 
 export async function GET(req: NextRequest) {
+  if (!(await getSession())) return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
+
   const { searchParams } = new URL(req.url)
   const cmpcode  = searchParams.get('cmpcode')  || '01'
   const citycode = searchParams.get('citycode') || 'MUM'
