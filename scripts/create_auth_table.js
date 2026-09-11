@@ -1,6 +1,6 @@
-// One-time, idempotent: creates the table behind the dashboard's sign-in /
-// sign-up. Deliberately separate from the ERP's own `login` table — dashboard
-// accounts never grant ERP access and ERP logins are never touched.
+// Idempotent: creates the table behind the dashboard's sign-in / sign-up, or
+// upgrades an existing one. Deliberately separate from the ERP's own `login`
+// table — dashboard accounts never grant ERP access and ERP logins are never touched.
 //
 //   node scripts/create_auth_table.js
 //
@@ -14,25 +14,42 @@ for (const line of fs.readFileSync(path.join(__dirname, '..', '.env'), 'utf8').s
   if (m && !(m[1] in process.env)) process.env[m[1]] = m[2];
 }
 
-// USERNAME uniqueness is case-insensitive: the DB collation is SQL_Latin1_General_CP1_CI_AS.
-const DDL = `
-IF OBJECT_ID('dbo.TBL_WMS_AUTH_USERS', 'U') IS NULL
-BEGIN
-  CREATE TABLE dbo.TBL_WMS_AUTH_USERS (
-    ID            INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_TBL_WMS_AUTH_USERS PRIMARY KEY,
-    USERNAME      VARCHAR(50)   NOT NULL CONSTRAINT UQ_TBL_WMS_AUTH_USERS_USERNAME UNIQUE,
-    FULLNAME      NVARCHAR(100) NOT NULL,
-    PASSWORD_HASH VARCHAR(100)  NOT NULL,   -- bcrypt
-    ROLE          VARCHAR(20)   NOT NULL CONSTRAINT DF_TBL_WMS_AUTH_USERS_ROLE    DEFAULT ('user'),
-    IS_ACTIVE     BIT           NOT NULL CONSTRAINT DF_TBL_WMS_AUTH_USERS_ACTIVE  DEFAULT (1),
-    CREATED_AT    DATETIME      NOT NULL CONSTRAINT DF_TBL_WMS_AUTH_USERS_CREATED DEFAULT (GETDATE()),
-    LAST_LOGIN_AT DATETIME      NULL
-  );
-  PRINT 'Created dbo.TBL_WMS_AUTH_USERS';
-END
-ELSE
-  PRINT 'dbo.TBL_WMS_AUTH_USERS already exists - nothing to do';
-`;
+// Each step runs as its own batch, so later steps compile against columns the
+// earlier ones add. USERNAME uniqueness is case-insensitive: the DB collation
+// is SQL_Latin1_General_CP1_CI_AS.
+const STEPS = [
+  `IF OBJECT_ID('dbo.TBL_WMS_AUTH_USERS', 'U') IS NULL
+   BEGIN
+     CREATE TABLE dbo.TBL_WMS_AUTH_USERS (
+       ID            INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_TBL_WMS_AUTH_USERS PRIMARY KEY,
+       USERNAME      VARCHAR(50)   NOT NULL CONSTRAINT UQ_TBL_WMS_AUTH_USERS_USERNAME UNIQUE,
+       FULLNAME      NVARCHAR(100) NOT NULL,
+       PASSWORD_HASH VARCHAR(100)  NOT NULL,   -- bcrypt
+       ROLE          VARCHAR(20)   NOT NULL CONSTRAINT DF_TBL_WMS_AUTH_USERS_ROLE    DEFAULT ('user'),
+       IS_ACTIVE     BIT           NOT NULL CONSTRAINT DF_TBL_WMS_AUTH_USERS_ACTIVE  DEFAULT (0),
+       CREATED_AT    DATETIME      NOT NULL CONSTRAINT DF_TBL_WMS_AUTH_USERS_CREATED DEFAULT (GETDATE()),
+       LAST_LOGIN_AT DATETIME      NULL,
+       APPROVED_AT   DATETIME      NULL,       -- NULL while inactive = sign-up waiting for approval
+       APPROVED_BY   INT           NULL        -- ID of the approving admin
+     );
+     PRINT 'Created dbo.TBL_WMS_AUTH_USERS';
+   END`,
+
+  // v2 — admin approval of sign-ups
+  `IF COL_LENGTH('dbo.TBL_WMS_AUTH_USERS', 'APPROVED_AT') IS NULL
+   BEGIN
+     ALTER TABLE dbo.TBL_WMS_AUTH_USERS ADD APPROVED_AT DATETIME NULL, APPROVED_BY INT NULL;
+     PRINT 'Added APPROVED_AT / APPROVED_BY';
+   END`,
+  `UPDATE dbo.TBL_WMS_AUTH_USERS SET APPROVED_AT = CREATED_AT WHERE IS_ACTIVE = 1 AND APPROVED_AT IS NULL;
+   IF @@ROWCOUNT > 0 PRINT 'Marked existing active accounts as approved';`,
+  `IF EXISTS (SELECT 1 FROM sys.default_constraints WHERE name = 'DF_TBL_WMS_AUTH_USERS_ACTIVE' AND definition <> '((0))')
+   BEGIN
+     ALTER TABLE dbo.TBL_WMS_AUTH_USERS DROP CONSTRAINT DF_TBL_WMS_AUTH_USERS_ACTIVE;
+     ALTER TABLE dbo.TBL_WMS_AUTH_USERS ADD CONSTRAINT DF_TBL_WMS_AUTH_USERS_ACTIVE DEFAULT (0) FOR IS_ACTIVE;
+     PRINT 'New accounts now default to inactive';
+   END`,
+];
 
 (async () => {
   const pool = await new sql.ConnectionPool({
@@ -44,9 +61,11 @@ ELSE
     options:  { encrypt: false, trustServerCertificate: true },
   }).connect();
 
-  const request = pool.request();
-  request.on('info', m => console.log(m.message));
-  await request.query(DDL);
+  for (const step of STEPS) {
+    const request = pool.request();
+    request.on('info', m => console.log(m.message));
+    await request.query(step);
+  }
 
   const cols = await pool.request().query(`
     SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH AS LEN, IS_NULLABLE

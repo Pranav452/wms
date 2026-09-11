@@ -1,6 +1,8 @@
 "use client";
 
 import Header from '@/components/layout/Header'
+import { useCurrentUser } from '@/components/layout/UserContext'
+import UserAdmin from '@/components/settings/UserAdmin'
 import { useDashboard } from '@/context/DashboardContext'
 import { FLOORS, RACKS, TOTAL_SHELVES, TOTAL_LOCATIONS, floorTotals } from '@/lib/racks'
 import { formatNumber } from '@/lib/utils'
@@ -11,15 +13,17 @@ import {
   Info,
   LifeBuoy,
   ShieldCheck,
+  Users,
 } from 'lucide-react'
 
-function SettingCard({ icon: Icon, title, children }: {
+function SettingCard({ icon: Icon, title, className = '', children }: {
   icon: typeof Info
   title: string
+  className?: string
   children: React.ReactNode
 }) {
   return (
-    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
+    <section className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 ${className}`}>
       <div className="flex items-center gap-2.5 mb-3">
         <div className="w-8 h-8 rounded-xl bg-red-50 text-red-500 flex items-center justify-center flex-shrink-0">
           <Icon className="w-4 h-4" />
@@ -42,12 +46,19 @@ function FactRow({ k, v }: { k: string; v: string }) {
 
 export default function SettingsPage() {
   const { asOnDate, fromDate, loading, refresh } = useDashboard()
+  const me = useCurrentUser()
 
   return (
     <>
       <Header title="Settings" breadcrumb="Settings" />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {me.role === 'admin' && (
+          <SettingCard icon={Users} title="Users & access" className="lg:col-span-2">
+            <UserAdmin currentUserId={me.id} />
+          </SettingCard>
+        )}
+
         <SettingCard icon={Info} title="About Bridge WMS">
           <p>
             Stock-status dashboard for the Seaport Logistics warehouse, Mumbai. It reads

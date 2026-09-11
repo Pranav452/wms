@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPool, sql } from '@/lib/db'
 import type { DashboardData } from '@/types/dashboard'
-import { getSession } from '@/lib/auth/session'
+import { getCurrentUser } from '@/lib/auth/session'
 
 export async function GET(req: NextRequest) {
-  if (!(await getSession())) return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
-
   const { searchParams } = new URL(req.url)
   const cmpcode  = searchParams.get('cmpcode')  || '01'
   const citycode = searchParams.get('citycode') || 'MUM'
@@ -14,6 +12,8 @@ export async function GET(req: NextRequest) {
   const fromdate = searchParams.get('fromdate') || ''
 
   try {
+    if (!(await getCurrentUser())) return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
+
     const pool    = await getPool()
     const request = pool.request()
     request.input('CMPCODE',  sql.VarChar(2),  cmpcode)

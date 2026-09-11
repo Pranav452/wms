@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useActionState } from 'react'
-import { CircleAlert, LoaderCircle, LogIn, UserPlus } from 'lucide-react'
+import { CircleAlert, CircleCheck, LoaderCircle, LogIn, UserPlus } from 'lucide-react'
 import { login, signup } from '@/app/actions/auth'
 import type { AuthFormState } from '@/types/auth'
 
@@ -73,7 +73,7 @@ export function LoginForm({ next }: { next: string }) {
     <Card
       title="Sign in"
       subtitle="Use your Bridge WMS account to open the dashboard."
-      footer={<>New to Bridge WMS? <Link href="/signup" className="font-medium text-red-500 hover:underline">Create an account</Link></>}
+      footer={<>New to Bridge WMS? <Link href="/signup" className="font-medium text-red-500 hover:underline">Request an account</Link></>}
     >
       <form action={action} className="space-y-4">
         <input type="hidden" name="next" value={next} />
@@ -89,10 +89,25 @@ export function LoginForm({ next }: { next: string }) {
 export function SignupForm() {
   const [state, action, pending] = useActionState(signup, EMPTY)
 
+  if (state.notice) {
+    return (
+      <Card
+        title="Request sent"
+        subtitle="An admin needs to approve your account first."
+        footer={<Link href="/login" className="font-medium text-red-500 hover:underline">Back to sign in</Link>}
+      >
+        <p role="status" className="flex items-start gap-2 rounded-lg border border-green-100 bg-green-50 px-3 py-2 text-xs text-green-700">
+          <CircleCheck className="w-4 h-4 flex-shrink-0 mt-px" />
+          {state.notice}
+        </p>
+      </Card>
+    )
+  }
+
   return (
     <Card
-      title="Create an account"
-      subtitle="You'll be signed in straight away."
+      title="Request an account"
+      subtitle="An admin approves new accounts before they can sign in."
       footer={<>Already have an account? <Link href="/login" className="font-medium text-red-500 hover:underline">Sign in</Link></>}
     >
       <form action={action} className="space-y-4">
@@ -108,7 +123,7 @@ export function SignupForm() {
         />
         <Field label="Confirm password" name="confirm" type="password" autoComplete="new-password" minLength={8} maxLength={72} />
         <FormError message={state.error} />
-        <SubmitButton pending={pending} icon={UserPlus} label="Create account" pendingLabel="Creating account…" />
+        <SubmitButton pending={pending} icon={UserPlus} label="Send request" pendingLabel="Sending…" />
       </form>
     </Card>
   )

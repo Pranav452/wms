@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPool, sql } from '@/lib/db'
-import { getSession } from '@/lib/auth/session'
+import { getCurrentUser } from '@/lib/auth/session'
 
 // Full-detail feed for stock sitting without a rack number — the export behind
 // the "No location" drawer. Same available-qty maths as /api/racks/stock (GRN −
@@ -157,13 +157,13 @@ function diagnose(r: UnlocatedRow): string {
 }
 
 export async function GET(req: NextRequest) {
-  if (!(await getSession())) return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
-
   const { searchParams } = new URL(req.url)
   const cmpcode = searchParams.get('cmpcode') || '01'
   const citycode = searchParams.get('citycode') || 'MUM'
 
   try {
+    if (!(await getCurrentUser())) return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
+
     const pool = await getPool()
     const request = pool.request()
     request.input('CMPCODE', sql.VarChar(3), cmpcode)

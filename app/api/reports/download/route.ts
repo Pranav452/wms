@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import net from 'net'
 import zlib from 'zlib'
 import * as XLSX from 'xlsx'
-import { getSession } from '@/lib/auth/session'
+import { getCurrentUser } from '@/lib/auth/session'
 
 export const maxDuration = 60
 export const preferredRegion = 'bom1'
@@ -96,12 +96,12 @@ function xlsToXlsx(body: Buffer): Buffer {
 // on the .NET side and returns instantly, STATUS is polled until done, RESULT streams the
 // already-finished file. Each of the three calls here is fast on its own.
 export async function GET(req: NextRequest) {
-  if (!(await getSession())) return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
-
   const sp     = req.nextUrl.searchParams
   const action = sp.get('action') ?? 'start'
 
   try {
+    if (!(await getCurrentUser())) return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
+
     if (action === 'start') {
       const type        = sp.get('type') ?? 'stock'
       const asondate    = sp.get('asondate') ?? new Date().toLocaleDateString('en-GB')

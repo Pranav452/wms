@@ -196,7 +196,7 @@ export default function Sidebar({ open, onClose, user }: SidebarProps) {
             </div>
             <div className="min-w-0 lg:opacity-0 lg:group-hover/nav:opacity-100 transition-opacity duration-150 lg:group-hover/nav:delay-75">
               <p className="text-sm font-semibold text-gray-900 truncate whitespace-nowrap">{user.name}</p>
-              <p className="text-xs text-gray-500 truncate whitespace-nowrap">@{user.username}</p>
+              <p className="text-xs text-gray-500 truncate whitespace-nowrap">@{user.username}{user.role === 'admin' && ' · Admin'}</p>
             </div>
           </div>
 

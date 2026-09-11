@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import Sidebar from './Sidebar'
 import { SidebarProvider } from './SidebarContext'
+import { UserProvider } from './UserContext'
 import type { SessionUser } from '@/types/auth'
 
 export default function DashboardShell({ user, children }: { user: SessionUser; children: React.ReactNode }) {
@@ -24,13 +25,15 @@ export default function DashboardShell({ user, children }: { user: SessionUser; 
   }, [open])
 
   return (
-    <SidebarProvider value={{ openSidebar: () => setOpen(true) }}>
-      <div className="flex min-h-screen bg-[#f4f2f2] font-sans text-gray-800 lg:p-4 lg:gap-6">
-        <Sidebar open={open} onClose={() => setOpen(false)} user={user} />
-        <main className="flex-1 min-w-0 flex flex-col p-4 lg:p-0">
-          {children}
-        </main>
-      </div>
-    </SidebarProvider>
+    <UserProvider value={user}>
+      <SidebarProvider value={{ openSidebar: () => setOpen(true) }}>
+        <div className="flex min-h-screen bg-[#f4f2f2] font-sans text-gray-800 lg:p-4 lg:gap-6">
+          <Sidebar open={open} onClose={() => setOpen(false)} user={user} />
+          <main className="flex-1 min-w-0 flex flex-col p-4 lg:p-0">
+            {children}
+          </main>
+        </div>
+      </SidebarProvider>
+    </UserProvider>
   )
 }
