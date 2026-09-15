@@ -2,8 +2,12 @@
 
 import { redirect } from 'next/navigation'
 import { createSession, deleteSession, getSession } from '@/lib/auth/session'
+import { normalizeEmail } from '@/lib/auth/email'
 import { hashPassword, verifyPassword, validatePassword } from '@/lib/auth/password'
-import { createPendingAccount, findLoginByUsername, setOwnPassword, stampLastLogin, statusOf, type LoginRecord } from '@/lib/auth/users'
+import {
+  createPendingAccount, findLoginByUsername, isUniqueViolation, setOwnPassword, stampLastLogin, statusOf,
+  type LoginRecord,
+} from '@/lib/auth/users'
 import type { AuthFormState } from '@/types/auth'
 
 const USERNAME_RE = /^[A-Za-z0-9._-]{3,30}$/
@@ -53,13 +57,17 @@ export async function login(_prev: AuthFormState, formData: FormData): Promise<A
 
 export async function signup(_prev: AuthFormState, formData: FormData): Promise<AuthFormState> {
   const fullname = String(formData.get('fullname') ?? '').trim().replace(/\s+/g, ' ')
+  const rawEmail = String(formData.get('email') ?? '').trim()
   const username = String(formData.get('username') ?? '').trim()
   const password = String(formData.get('password') ?? '')
   const confirm  = String(formData.get('confirm') ?? '')
-  const fields   = { fullname, username }
+  const fields   = { fullname, username, email: rawEmail }
 
   if (fullname.length < 2 || fullname.length > 100)
     return { error: 'Enter your full name (2–100 characters).', fields }
+  const email = normalizeEmail(rawEmail)
+  if (!email)
+    return { error: 'Enter a valid email address — password reset links are sent there.', fields }
   if (!USERNAME_RE.test(username))
     return { error: 'Username must be 3–30 characters: letters, numbers, dot, dash or underscore.', fields }
   const pwError = validatePassword(password)
@@ -70,12 +78,13 @@ export async function signup(_prev: AuthFormState, formData: FormData): Promise<
 
   const hash = await hashPassword(password)
   try {
-    await createPendingAccount(username, fullname, hash)
+    await createPendingAccount(username, fullname, email, hash)
   } catch (err) {
-    // 2627 / 2601 = unique-key violation. The DB collation is case-insensitive,
-    // so "Ravi" and "ravi" count as the same username.
-    const num = (err as { number?: number }).number
-    if (num === 2627 || num === 2601) return { error: 'That username is already taken.', fields }
+    if (isUniqueViolation(err)) {
+      return /EMAIL/i.test(err instanceof Error ? err.message : '')
+        ? { error: 'That email address is already registered.', fields }
+        : { error: 'That username is already taken.', fields }
+    }
     console.error('[auth/signup]', err)
     return { error: 'Could not create the account. Try again in a moment.', fields }
   }

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth/session'
+import { normalizeEmail } from '@/lib/auth/email'
 import { hashPassword, validatePassword } from '@/lib/auth/password'
-import { adminResetPassword, applyAccountAction, isAccountAction, listAccounts } from '@/lib/auth/users'
+import {
+  adminResetPassword, applyAccountAction, isAccountAction, isUniqueViolation, listAccounts, setAccountEmail,
+} from '@/lib/auth/users'
 import type { SessionUser } from '@/types/auth'
 
 // Admin-only user management behind Settings → Users & access. The caller's
@@ -18,6 +21,13 @@ function failed(err: unknown) {
   return NextResponse.json({ error: message }, { status: 500 })
 }
 
+async function changed() {
+  return NextResponse.json(
+    { error: 'That account changed in the meantime — the list has been refreshed.', users: await listAccounts() },
+    { status: 409 },
+  )
+}
+
 export async function GET() {
   try {
     const me = await getCurrentUser()
@@ -28,8 +38,9 @@ export async function GET() {
   }
 }
 
-// body: { id, action } where action is one of the state-machine actions, or
-//       { id, action: 'reset-password', password } to set a temporary password
+// body: { id, action }                              — one of the state-machine actions
+//       { id, action: 'reset-password', password } — set a temporary password
+//       { id, action: 'set-email', email }         — '' removes the address
 export async function POST(req: NextRequest) {
   try {
     const me = await getCurrentUser()
@@ -38,12 +49,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Expected JSON' }, { status: 415 })
     }
 
-    const body   = await req.json().catch(() => null) as { id?: unknown; action?: unknown; password?: unknown } | null
+    const body   = await req.json().catch(() => null) as { id?: unknown; action?: unknown; password?: unknown; email?: unknown } | null
     const id     = Number(body?.id)
     const action = body?.action
     if (!Number.isInteger(id)) {
       return NextResponse.json({ error: 'Bad request' }, { status: 400 })
     }
+
+    // Editing an email address is allowed on any account, including your own.
+    if (action === 'set-email') {
+      const raw   = typeof body?.email === 'string' ? body.email.trim() : ''
+      const email = raw ? normalizeEmail(raw) : null
+      if (raw && !email) return NextResponse.json({ error: 'Enter a valid email address.' }, { status: 400 })
+      try {
+        if (!(await setAccountEmail(id, email))) return changed()
+      } catch (err) {
+        if (isUniqueViolation(err)) {
+          return NextResponse.json({ error: 'That email address is already used by another account.' }, { status: 409 })
+        }
+        throw err
+      }
+      return NextResponse.json({ users: await listAccounts() })
+    }
+
     // keeps at least one admin around, and stops an admin locking themselves
     // out of their own password: self-service changes go through /change-password
     if (id === me.id) {
@@ -55,24 +83,14 @@ export async function POST(req: NextRequest) {
       const pwError  = validatePassword(password)
       if (pwError) return NextResponse.json({ error: pwError }, { status: 400 })
 
-      if (!(await adminResetPassword(id, await hashPassword(password)))) {
-        return NextResponse.json(
-          { error: 'That account changed in the meantime — the list has been refreshed.', users: await listAccounts() },
-          { status: 409 },
-        )
-      }
+      if (!(await adminResetPassword(id, await hashPassword(password)))) return changed()
       return NextResponse.json({ users: await listAccounts() })
     }
 
     if (!isAccountAction(action)) {
       return NextResponse.json({ error: 'Bad request' }, { status: 400 })
     }
-    if (!(await applyAccountAction(id, action, me.id))) {
-      return NextResponse.json(
-        { error: 'That account changed in the meantime — the list has been refreshed.', users: await listAccounts() },
-        { status: 409 },
-      )
-    }
+    if (!(await applyAccountAction(id, action, me.id))) return changed()
     return NextResponse.json({ users: await listAccounts() })
   } catch (err) {
     return failed(err)

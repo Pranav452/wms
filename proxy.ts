@@ -1,15 +1,24 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth/token'
 
-// Reachable without signing in. Every other page and every /api route needs a
-// valid session cookie. Route handlers re-check the session themselves too —
-// this is the fast outer gate, not the only one.
+// Sign-in screens: reachable without signing in; signed-in users are sent on
+// to the dashboard. Every other page and every /api route needs a valid
+// session cookie. Route handlers re-check the session themselves too — this is
+// the fast outer gate, not the only one.
 const PUBLIC_PATHS = ['/login', '/signup']
+// Password recovery: reachable whether or not the browser holds a session, so
+// an emailed reset link always opens.
+const OPEN_PATHS = ['/forgot-password', '/reset-password']
+
+const matches = (pathname: string, paths: string[]) =>
+  paths.some(p => pathname === p || pathname.startsWith(p + '/'))
 
 export async function proxy(req: NextRequest) {
   const { pathname, search } = req.nextUrl
+  if (matches(pathname, OPEN_PATHS)) return NextResponse.next()
+
   const session  = await verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value)
-  const isPublic = PUBLIC_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'))
+  const isPublic = matches(pathname, PUBLIC_PATHS)
 
   if (isPublic) {
     // already signed in — skip the sign-in screens

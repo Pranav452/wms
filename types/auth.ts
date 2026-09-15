@@ -6,11 +6,11 @@ export interface SessionUser {
   role:     string
 }
 
-// What the sign-in / sign-up Server Actions hand back to their forms
+// What the auth Server Actions hand back to their forms
 export interface AuthFormState {
   error?:  string
-  notice?: string                                     // success message (sign-up request sent)
-  fields?: { username?: string; fullname?: string }   // re-filled so a failed submit doesn't wipe them
+  notice?: string                                                     // success message
+  fields?: { username?: string; fullname?: string; email?: string }  // re-filled so a failed submit doesn't wipe them
 }
 
 // pending = signed up, never approved; disabled = approved, then switched off
@@ -23,6 +23,7 @@ export interface AdminUserRow {
   id:           number
   username:     string
   name:         string
+  email:        string | null  // where password reset links go
   role:         string
   status:       AccountStatus
   mustChangePw: boolean        // admin reset a temp password; user hasn't changed it yet

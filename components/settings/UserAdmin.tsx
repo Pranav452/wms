@@ -1,12 +1,13 @@
 "use client";
 
 import { Fragment, useEffect, useState } from 'react'
-import { Ban, Check, Copy, KeyRound, RefreshCw, RotateCcw, ShieldCheck, ShieldOff, X } from 'lucide-react'
+import { Ban, Check, Copy, KeyRound, Mail, RefreshCw, RotateCcw, ShieldCheck, ShieldOff, X } from 'lucide-react'
 import { PASSWORD_HINT } from '@/lib/auth/constants'
 import type { AccountStatus, AdminUserAction, AdminUserRow } from '@/types/auth'
 
 type UsersResponse = { users?: AdminUserRow[]; error?: string }
 type ActionResult  = { error?: string }
+type Panel         = { id: number; kind: 'reset' | 'email' }
 
 async function fetchUsers(): Promise<UsersResponse> {
   try {
@@ -144,11 +145,55 @@ function ResetForm({ username, busy, onSubmit, onClose }: {
   )
 }
 
-function UserRow({ u, isSelf, busy, onAction, onReset }: {
+// Inline email editor. An empty box removes the address.
+function EmailForm({ username, current, busy, onSubmit, onClose }: {
+  username: string
+  current:  string | null
+  busy:     boolean
+  onSubmit: (email: string) => Promise<ActionResult>
+  onClose:  () => void
+}) {
+  const [email, setEmail] = useState(current ?? '')
+  const [error, setError] = useState<string | null>(null)
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    const r = await onSubmit(email.trim())
+    if (r.error) setError(r.error)
+    else onClose()
+  }
+
+  return (
+    <form onSubmit={submit} className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2">
+      <p className="text-xs font-medium text-gray-600">Email for @{username}</p>
+      <input
+        type="email"
+        value={email}
+        onChange={e => setEmail(e.target.value)}
+        maxLength={254}
+        autoComplete="off"
+        placeholder="name@company.com"
+        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
+      />
+      <p className="text-[11px] text-gray-400">Password reset links are sent here. Leave it empty to remove the address.</p>
+      {error && <p role="alert" className="text-xs text-red-500">{error}</p>}
+      <div className="flex items-center gap-2">
+        <button type="submit" disabled={busy} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-500 text-white text-xs font-medium hover:bg-red-600 active:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed">
+          <Mail className="w-3.5 h-3.5" /> {busy ? 'Saving…' : 'Save email'}
+        </button>
+        <button type="button" onClick={onClose} className="ml-auto px-2.5 py-1.5 rounded-lg text-xs text-gray-500 hover:text-gray-800">Cancel</button>
+      </div>
+    </form>
+  )
+}
+
+function UserRow({ u, isSelf, busy, onAction, onEmail, onReset }: {
   u:        AdminUserRow
   isSelf:   boolean
   busy:     boolean
   onAction: (id: number, action: AdminUserAction) => void
+  onEmail:  () => void
   onReset?: () => void
 }) {
   const act = (action: AdminUserAction) => () => onAction(u.id, action)
@@ -162,32 +207,34 @@ function UserRow({ u, isSelf, busy, onAction, onReset }: {
         <p className="text-xs text-gray-400 truncate">
           @{u.username} · {u.status === 'pending' ? `requested ${fmt(u.createdAt)}` : `last sign-in ${fmt(u.lastLoginAt)}`}
         </p>
+        <p className={`text-xs truncate ${u.email ? 'text-gray-500' : 'text-amber-600'}`}>
+          {u.email ?? 'No email — password reset by email won’t work'}
+        </p>
       </div>
       <div className="flex items-center gap-1.5">
         {u.role === 'admin' && <Pill cls="bg-red-50 text-red-600">Admin</Pill>}
         {u.mustChangePw && <Pill cls="bg-amber-100 text-amber-700">Temp password</Pill>}
         <Pill cls={STATUS[u.status].cls}>{STATUS[u.status].label}</Pill>
       </div>
-      {!isSelf && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {u.status === 'pending' && <>
-            <ActionButton icon={Check} label="Approve" primary disabled={busy} onClick={act('approve')} />
-            <ActionButton icon={X} label="Reject" disabled={busy} onClick={act('reject')} />
-          </>}
-          {u.status === 'active' && <>
-            {u.role === 'admin'
-              ? <ActionButton icon={ShieldOff} label="Remove admin" disabled={busy} onClick={act('remove-admin')} />
-              : <ActionButton icon={ShieldCheck} label="Make admin" disabled={busy} onClick={act('make-admin')} />}
-            <ActionButton icon={Ban} label="Disable" disabled={busy} onClick={act('disable')} />
-          </>}
-          {u.status === 'disabled' && (
-            <ActionButton icon={RotateCcw} label="Enable" disabled={busy} onClick={act('enable')} />
-          )}
-          {onReset && (
-            <ActionButton icon={KeyRound} label="Reset password" disabled={busy} onClick={onReset} />
-          )}
-        </div>
-      )}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {!isSelf && u.status === 'pending' && <>
+          <ActionButton icon={Check} label="Approve" primary disabled={busy} onClick={act('approve')} />
+          <ActionButton icon={X} label="Reject" disabled={busy} onClick={act('reject')} />
+        </>}
+        {!isSelf && u.status === 'active' && <>
+          {u.role === 'admin'
+            ? <ActionButton icon={ShieldOff} label="Remove admin" disabled={busy} onClick={act('remove-admin')} />
+            : <ActionButton icon={ShieldCheck} label="Make admin" disabled={busy} onClick={act('make-admin')} />}
+          <ActionButton icon={Ban} label="Disable" disabled={busy} onClick={act('disable')} />
+        </>}
+        {!isSelf && u.status === 'disabled' && (
+          <ActionButton icon={RotateCcw} label="Enable" disabled={busy} onClick={act('enable')} />
+        )}
+        <ActionButton icon={Mail} label={u.email ? 'Edit email' : 'Add email'} disabled={busy} onClick={onEmail} />
+        {onReset && (
+          <ActionButton icon={KeyRound} label="Reset password" disabled={busy} onClick={onReset} />
+        )}
+      </div>
     </li>
   )
 }
@@ -195,10 +242,10 @@ function UserRow({ u, isSelf, busy, onAction, onReset }: {
 // Settings → Users & access (admins only). Data and changes go through
 // /api/admin/users, which re-checks the caller's admin role in the DB.
 export default function UserAdmin({ currentUserId }: { currentUserId: number }) {
-  const [users, setUsers]           = useState<AdminUserRow[] | null>(null)
-  const [error, setError]           = useState<string | null>(null)
-  const [busy,  setBusy]            = useState<number | null>(null)   // id of the row being changed
-  const [resetId, setResetId]       = useState<number | null>(null)  // id of the row with its reset form open
+  const [users, setUsers] = useState<AdminUserRow[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [busy,  setBusy]  = useState<number | null>(null)   // id of the row being changed
+  const [panel, setPanel] = useState<Panel | null>(null)    // row with its reset / email form open
 
   function apply(r: UsersResponse) {
     if (r.users) setUsers(r.users)
@@ -211,48 +258,37 @@ export default function UserAdmin({ currentUserId }: { currentUserId: number }) 
     return () => { cancelled = true }
   }, [])
 
-  async function onAction(id: number, action: AdminUserAction) {
-    if (action === 'reject' && !window.confirm('Reject this request? The sign-up is deleted.')) return
-    setBusy(id)
-    try {
-      const res = await fetch('/api/admin/users', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ id, action }),
-      })
-      apply(await res.json() as UsersResponse)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  async function resetPassword(id: number, password: string): Promise<ActionResult> {
+  // POSTs one change. The inline panels show their own errors, so `inline`
+  // keeps those out of the banner at the top.
+  async function send(id: number, body: Record<string, unknown>, inline = false): Promise<ActionResult> {
     setBusy(id)
     try {
       const res  = await fetch('/api/admin/users', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ id, action: 'reset-password', password }),
+        body:    JSON.stringify({ id, ...body }),
       })
       const data = await res.json() as UsersResponse
       if (data.users) setUsers(data.users)
-      if (!res.ok) {
-        const message = data.error ?? 'Could not reset the password.'
-        setError(message)
-        return { error: message }
-      }
-      setError(null)
-      return {}
+      const message = res.ok ? null : (data.error ?? `Request failed (${res.status})`)
+      if (!inline) setError(message)
+      return message ? { error: message } : {}
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
-      setError(message)
+      if (!inline) setError(message)
       return { error: message }
     } finally {
       setBusy(null)
     }
   }
+
+  function onAction(id: number, action: AdminUserAction) {
+    if (action === 'reject' && !window.confirm('Reject this request? The sign-up is deleted.')) return
+    void send(id, { action })
+  }
+
+  const togglePanel = (id: number, kind: Panel['kind']) =>
+    setPanel(p => (p?.id === id && p.kind === kind ? null : { id, kind }))
 
   if (!users) {
     return error
@@ -264,7 +300,7 @@ export default function UserAdmin({ currentUserId }: { currentUserId: number }) 
   const accounts = users.filter(u => u.status !== 'pending')
 
   function renderRow(u: AdminUserRow) {
-    const canReset = u.status !== 'pending' && u.id !== currentUserId
+    const open = panel?.id === u.id ? panel.kind : null
     return (
       <Fragment key={u.id}>
         <UserRow
@@ -272,15 +308,27 @@ export default function UserAdmin({ currentUserId }: { currentUserId: number }) 
           isSelf={u.id === currentUserId}
           busy={busy === u.id}
           onAction={onAction}
-          onReset={canReset ? () => setResetId(id => (id === u.id ? null : u.id)) : undefined}
+          onEmail={() => togglePanel(u.id, 'email')}
+          onReset={u.status !== 'pending' && u.id !== currentUserId ? () => togglePanel(u.id, 'reset') : undefined}
         />
-        {resetId === u.id && (
+        {open === 'reset' && (
           <li className="pb-3">
             <ResetForm
               username={u.username}
               busy={busy === u.id}
-              onSubmit={pw => resetPassword(u.id, pw)}
-              onClose={() => setResetId(null)}
+              onSubmit={pw => send(u.id, { action: 'reset-password', password: pw }, true)}
+              onClose={() => setPanel(null)}
+            />
+          </li>
+        )}
+        {open === 'email' && (
+          <li className="pb-3">
+            <EmailForm
+              username={u.username}
+              current={u.email}
+              busy={busy === u.id}
+              onSubmit={email => send(u.id, { action: 'set-email', email }, true)}
+              onClose={() => setPanel(null)}
             />
           </li>
         )}
@@ -293,7 +341,8 @@ export default function UserAdmin({ currentUserId }: { currentUserId: number }) 
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs text-gray-400">
           New sign-ups can&apos;t sign in until an admin approves them. Disabling someone cuts off their
-          access straight away. Resetting a password sets a temporary one they must change at next sign-in.
+          access straight away. Forgotten passwords are reset by email to the address on file, or you can
+          set a temporary one they must change at next sign-in.
         </p>
         <button
           type="button"

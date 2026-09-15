@@ -9,7 +9,8 @@ import type { AccountStatus, AdminUserAction, AdminUserRow } from '@/types/auth'
 // DATETIME columns hold server wall-clock time (GETDATE()); mssql hands them
 // back as if they were UTC, so format them with timeZone: 'UTC' to show them
 // as stored.
-const USERS = 'dbo.TBL_WMS_AUTH_USERS'
+const USERS  = 'dbo.TBL_WMS_AUTH_USERS'
+const RESETS = 'dbo.TBL_WMS_AUTH_PASSWORD_RESETS'
 
 export interface AccountRecord {
   ID:             number
@@ -27,6 +28,13 @@ export interface LoginRecord extends AccountRecord {
 // Never approved = pending sign-up; approved then switched off = disabled.
 export function statusOf(a: Pick<AccountRecord, 'IS_ACTIVE' | 'APPROVED_AT'>): AccountStatus {
   return a.IS_ACTIVE ? 'active' : a.APPROVED_AT ? 'disabled' : 'pending'
+}
+
+// 2627 / 2601 = unique-key violation (USERNAME or EMAIL). The DB collation is
+// case-insensitive, so "Ravi"/"ravi" and "A@x.com"/"a@x.com" clash.
+export function isUniqueViolation(err: unknown): boolean {
+  const num = (err as { number?: number } | null)?.number
+  return num === 2627 || num === 2601
 }
 
 const ACCOUNT_COLS = 'ID, USERNAME, FULLNAME, ROLE, IS_ACTIVE, APPROVED_AT, MUST_CHANGE_PW'
@@ -48,13 +56,15 @@ export async function findAccountById(id: number): Promise<AccountRecord | undef
 }
 
 // New sign-ups start inactive and unapproved, i.e. pending.
-export async function createPendingAccount(username: string, fullname: string, passwordHash: string): Promise<void> {
+export async function createPendingAccount(username: string, fullname: string, email: string, passwordHash: string): Promise<void> {
   const pool = await getPool()
   await pool.request()
     .input('USERNAME', sql.VarChar(50),   username)
     .input('FULLNAME', sql.NVarChar(100), fullname)
+    .input('EMAIL',    sql.VarChar(254),  email)
     .input('HASH',     sql.VarChar(100),  passwordHash)
-    .query(`INSERT INTO ${USERS} (USERNAME, FULLNAME, PASSWORD_HASH, IS_ACTIVE) VALUES (@USERNAME, @FULLNAME, @HASH, 0)`)
+    .query(`INSERT INTO ${USERS} (USERNAME, FULLNAME, EMAIL, PASSWORD_HASH, IS_ACTIVE)
+            VALUES (@USERNAME, @FULLNAME, @EMAIL, @HASH, 0)`)
 }
 
 export async function stampLastLogin(id: number): Promise<void> {
@@ -64,6 +74,10 @@ export async function stampLastLogin(id: number): Promise<void> {
     .query(`UPDATE ${USERS} SET LAST_LOGIN_AT = GETDATE() WHERE ID = @ID`)
 }
 
+// Any password change also cancels the account's outstanding emailed reset links.
+const EXPIRE_RESET_LINKS = `UPDATE ${RESETS} SET EXPIRES_AT = GETDATE()
+                            WHERE USER_ID = @ID AND USED_AT IS NULL AND EXPIRES_AT > GETDATE()`
+
 // The user sets their own new password — clears the must-change flag.
 export async function setOwnPassword(id: number, passwordHash: string): Promise<void> {
   const pool = await getPool()
@@ -72,7 +86,8 @@ export async function setOwnPassword(id: number, passwordHash: string): Promise<
     .input('HASH', sql.VarChar(100), passwordHash)
     .query(`UPDATE ${USERS}
             SET PASSWORD_HASH = @HASH, MUST_CHANGE_PW = 0, PASSWORD_CHANGED_AT = GETDATE()
-            WHERE ID = @ID`)
+            WHERE ID = @ID;
+            ${EXPIRE_RESET_LINKS}`)
 }
 
 // Admin sets a temporary password: the user must change it at next sign-in.
@@ -85,11 +100,23 @@ export async function adminResetPassword(id: number, passwordHash: string): Prom
     .input('HASH', sql.VarChar(100), passwordHash)
     .query(`UPDATE ${USERS}
             SET PASSWORD_HASH = @HASH, MUST_CHANGE_PW = 1, PASSWORD_CHANGED_AT = GETDATE()
-            WHERE ID = @ID AND APPROVED_AT IS NOT NULL`)
+            WHERE ID = @ID AND APPROVED_AT IS NOT NULL;
+            IF @@ROWCOUNT > 0 ${EXPIRE_RESET_LINKS}`)
+  return result.rowsAffected[0] > 0
+}
+
+// null removes the address. false when the account no longer exists.
+export async function setAccountEmail(id: number, email: string | null): Promise<boolean> {
+  const pool   = await getPool()
+  const result = await pool.request()
+    .input('ID',    sql.Int,         id)
+    .input('EMAIL', sql.VarChar(254), email)
+    .query(`UPDATE ${USERS} SET EMAIL = @EMAIL WHERE ID = @ID`)
   return result.rowsAffected[0] > 0
 }
 
 interface ListRow extends AccountRecord {
+  EMAIL:         string | null
   CREATED_AT:    Date
   LAST_LOGIN_AT: Date | null
   APPROVER:      string | null
@@ -99,7 +126,7 @@ interface ListRow extends AccountRecord {
 export async function listAccounts(): Promise<AdminUserRow[]> {
   const pool   = await getPool()
   const result = await pool.request().query<ListRow>(`
-    SELECT U.ID, U.USERNAME, U.FULLNAME, U.ROLE, U.IS_ACTIVE, U.APPROVED_AT, U.MUST_CHANGE_PW,
+    SELECT U.ID, U.USERNAME, U.FULLNAME, U.EMAIL, U.ROLE, U.IS_ACTIVE, U.APPROVED_AT, U.MUST_CHANGE_PW,
            U.CREATED_AT, U.LAST_LOGIN_AT, APPROVER = A.USERNAME
     FROM ${USERS} U
     LEFT JOIN ${USERS} A ON A.ID = U.APPROVED_BY
@@ -108,6 +135,7 @@ export async function listAccounts(): Promise<AdminUserRow[]> {
     id:           u.ID,
     username:     u.USERNAME,
     name:         u.FULLNAME,
+    email:        u.EMAIL,
     role:         u.ROLE,
     status:       statusOf(u),
     mustChangePw: u.MUST_CHANGE_PW,
