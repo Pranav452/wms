@@ -8,6 +8,7 @@ import { ErrorState } from '@/components/shared/LoadingState'
 import { StockSkeleton } from '@/components/shared/Skeleton'
 import { useDashboard } from '@/context/DashboardContext'
 import { formatNumber } from '@/lib/utils'
+import { trackDownload } from '@/lib/track'
 import type { RS3_StockDetail } from '@/types/dashboard'
 
 const stockColumns: Column<RS3_StockDetail>[] = [
@@ -88,6 +89,7 @@ export default function StockPage() {
       const label = agingFilter === 'ALL' ? 'all-ages' : `${agingFilter}-days`
       const stamp = new Date().toLocaleDateString('en-CA') // local yyyy-mm-dd, not UTC
       XLSX.writeFile(wb, `stock-by-sku-${label}-${stamp}.xlsx`)
+      trackDownload('stock-by-sku', `${rows.length} rows · ${agingFilter === 'ALL' ? 'all ages' : `${agingFilter} days`}${eanFilter.trim() ? ` · EAN filter "${eanFilter.trim()}"` : ''}`)
     } finally {
       setExporting(false)
     }

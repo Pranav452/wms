@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import Sidebar from './Sidebar'
 import { SidebarProvider } from './SidebarContext'
 import { UserProvider } from './UserContext'
+import { trackPageView } from '@/lib/track'
 import type { SessionUser } from '@/types/auth'
 
 export default function DashboardShell({ user, children }: { user: SessionUser; children: React.ReactNode }) {
@@ -23,6 +24,9 @@ export default function DashboardShell({ user, children }: { user: SessionUser; 
     document.body.style.overflow = open ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
   }, [open])
+
+  // Page visits for the admin Activity page (repeat visits within a few minutes count once)
+  useEffect(() => { trackPageView(pathname) }, [pathname])
 
   return (
     <UserProvider value={user}>

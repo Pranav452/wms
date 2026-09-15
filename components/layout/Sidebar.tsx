@@ -17,6 +17,7 @@ import {
   ChevronDown,
   RotateCcw,
   LogOut,
+  Activity,
   X,
 } from 'lucide-react'
 import { logout } from '@/app/actions/auth'
@@ -214,6 +215,17 @@ export default function Sidebar({ open, onClose, user }: SidebarProps) {
 
         <div>
           <div className="border-t pt-4 space-y-0.5">
+            {user.role === 'admin' && (
+              <Link
+                href="/activity"
+                onClick={onClose}
+                title="Activity"
+                className="flex items-center gap-3 px-3 py-3 lg:py-2.5 rounded-lg text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+              >
+                <Activity className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                <RailLabel>Activity</RailLabel>
+              </Link>
+            )}
             <Link
               href="/settings"
               onClick={onClose}

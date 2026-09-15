@@ -10,6 +10,7 @@ import { ErrorState } from '@/components/shared/LoadingState'
 import { MRPSkeleton } from '@/components/shared/Skeleton'
 import { useDashboard } from '@/context/DashboardContext'
 import { formatNumber, bySPDate } from '@/lib/utils'
+import { trackDownload } from '@/lib/track'
 import type { RS5_MrpPending, RS16_MrpPendingContainer, RS26_MrpMismatch } from '@/types/dashboard'
 
 const pendingColumns: Column<RS5_MrpPending>[] = [
@@ -99,6 +100,7 @@ export default function MrpPage() {
       XLSX.utils.book_append_sheet(wb, ws, 'MRP Mismatch')
       const stamp = new Date().toLocaleDateString('en-CA') // local yyyy-mm-dd, not UTC
       XLSX.writeFile(wb, `mrp-mismatch_${stamp}.xlsx`)
+      trackDownload('mrp-mismatch', `${rows.length} rows`)
     } finally {
       setExportingMismatch(false)
     }

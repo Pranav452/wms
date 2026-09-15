@@ -24,6 +24,7 @@ import {
   type FillBucket,
 } from '@/lib/rackstock'
 import { formatNumber } from '@/lib/utils'
+import { trackDownload } from '@/lib/track'
 
 type Metric = 'occupancy' | 'items' | 'eans'
 type View = 'list' | 'grid'
@@ -442,6 +443,7 @@ function UnlocatedExport() {
       XLSX.utils.book_append_sheet(wb, ws, 'No location')
       const stamp = new Date().toLocaleDateString('en-CA') // local yyyy-mm-dd
       XLSX.writeFile(wb, `no-location-stock-${stamp}.xlsx`)
+      trackDownload('no-location-stock', `${sheet.length} rows`)
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
     } finally {

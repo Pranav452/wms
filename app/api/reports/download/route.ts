@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { after, NextRequest, NextResponse } from 'next/server'
 import net from 'net'
 import zlib from 'zlib'
 import * as XLSX from 'xlsx'
 import { getCurrentUser } from '@/lib/auth/session'
+import { logActivity, requestMeta } from '@/lib/activity/log'
 
 export const maxDuration = 60
 export const preferredRegion = 'bom1'
@@ -100,7 +101,8 @@ export async function GET(req: NextRequest) {
   const action = sp.get('action') ?? 'start'
 
   try {
-    if (!(await getCurrentUser())) return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
+    const me = await getCurrentUser()
+    if (!me) return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
 
     if (action === 'start') {
       const type        = sp.get('type') ?? 'stock'
@@ -136,6 +138,18 @@ export async function GET(req: NextRequest) {
       const asondate = sp.get('asondate') ?? ''
       const dateSlug = asondate.replace(/\//g, '-') || 'result'
       const filename = `${type}-report-${dateSlug}.xlsx`
+
+      // Who downloaded which report, for the admin Activity page. Logged after
+      // the response so it can never slow down or break the download itself.
+      const meta = requestMeta(req.headers)
+      after(() =>
+        logActivity({
+          user:   me,
+          event:  'download',
+          target: type === 'itemstatus' ? 'item-status-report' : 'stock-status-report',
+          detail: asondate ? `As on ${asondate}` : null,
+          ...meta,
+        }).catch(err => console.error('[reports/download] activity log failed', err)))
 
       return new NextResponse(new Uint8Array(xlsxBuf), {
         headers: {
