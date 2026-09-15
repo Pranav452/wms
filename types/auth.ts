@@ -20,13 +20,14 @@ export type AdminUserAction = 'approve' | 'reject' | 'enable' | 'disable' | 'mak
 
 // One row of Settings → Users & access (GET /api/admin/users)
 export interface AdminUserRow {
-  id:          number
-  username:    string
-  name:        string
-  role:        string
-  status:      AccountStatus
-  createdAt:   string
-  lastLoginAt: string | null
-  approvedAt:  string | null
-  approvedBy:  string | null   // approver's username
+  id:           number
+  username:     string
+  name:         string
+  role:         string
+  status:       AccountStatus
+  mustChangePw: boolean        // admin reset a temp password; user hasn't changed it yet
+  createdAt:    string
+  lastLoginAt:  string | null
+  approvedAt:   string | null
+  approvedBy:   string | null  // approver's username
 }

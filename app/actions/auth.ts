@@ -1,18 +1,17 @@
 'use server'
 
-import bcrypt from 'bcryptjs'
 import { redirect } from 'next/navigation'
-import { createSession, deleteSession } from '@/lib/auth/session'
-import { createPendingAccount, findLoginByUsername, stampLastLogin, statusOf, type LoginRecord } from '@/lib/auth/users'
+import { createSession, deleteSession, getSession } from '@/lib/auth/session'
+import { hashPassword, verifyPassword, validatePassword } from '@/lib/auth/password'
+import { createPendingAccount, findLoginByUsername, setOwnPassword, stampLastLogin, statusOf, type LoginRecord } from '@/lib/auth/users'
 import type { AuthFormState } from '@/types/auth'
 
-const BCRYPT_ROUNDS = 12
-const USERNAME_RE   = /^[A-Za-z0-9._-]{3,30}$/
+const USERNAME_RE = /^[A-Za-z0-9._-]{3,30}$/
 
 // Compared against when the username doesn't exist, so a miss costs the same
 // bcrypt time as a wrong password and response timing can't reveal usernames.
 let dummyHash: Promise<string> | null = null
-const getDummyHash = () => (dummyHash ??= bcrypt.hash('no-such-user', BCRYPT_ROUNDS))
+const getDummyHash = () => (dummyHash ??= hashPassword('no-such-user'))
 
 // Only same-app relative paths — never an open redirect to another host.
 function safeNext(value: FormDataEntryValue | null): string {
@@ -34,7 +33,7 @@ export async function login(_prev: AuthFormState, formData: FormData): Promise<A
     return { error: 'Could not reach the database. Try again in a moment.', fields }
   }
 
-  const valid = await bcrypt.compare(password, user?.PASSWORD_HASH ?? await getDummyHash())
+  const valid = await verifyPassword(password, user?.PASSWORD_HASH ?? await getDummyHash())
   if (!user || !valid) return { error: 'Invalid username or password.', fields }
 
   // only reached with the right password, so these don't reveal which usernames exist
@@ -63,13 +62,13 @@ export async function signup(_prev: AuthFormState, formData: FormData): Promise<
     return { error: 'Enter your full name (2–100 characters).', fields }
   if (!USERNAME_RE.test(username))
     return { error: 'Username must be 3–30 characters: letters, numbers, dot, dash or underscore.', fields }
-  // bcrypt only reads the first 72 bytes
-  if (password.length < 8 || new TextEncoder().encode(password).length > 72 || !/[A-Za-z]/.test(password) || !/\d/.test(password))
-    return { error: 'Password must be 8–72 characters and include a letter and a number.', fields }
+  const pwError = validatePassword(password)
+  if (pwError)
+    return { error: pwError, fields }
   if (password !== confirm)
     return { error: 'Passwords do not match.', fields }
 
-  const hash = await bcrypt.hash(password, BCRYPT_ROUNDS)
+  const hash = await hashPassword(password)
   try {
     await createPendingAccount(username, fullname, hash)
   } catch (err) {
@@ -83,6 +82,47 @@ export async function signup(_prev: AuthFormState, formData: FormData): Promise<
 
   // No session: the account can't sign in until an admin approves it.
   return { notice: `Your account "${username}" is waiting for approval. Let your administrator know you've signed up — you can sign in as soon as they approve it.` }
+}
+
+// Used both for a forced change after an admin reset and for a voluntary
+// self-service change. Requires the current password either way, so an
+// unattended signed-in session can't be used to lock the owner out.
+export async function changePassword(_prev: AuthFormState, formData: FormData): Promise<AuthFormState> {
+  const session = await getSession()
+  if (!session) redirect('/login')
+
+  const current = String(formData.get('current') ?? '')
+  const next    = String(formData.get('password') ?? '')
+  const confirm = String(formData.get('confirm') ?? '')
+
+  if (!current) return { error: 'Enter your current password.' }
+  const pwError = validatePassword(next)
+  if (pwError) return { error: pwError }
+  if (next !== confirm) return { error: 'New passwords do not match.' }
+
+  let user: LoginRecord | undefined
+  try {
+    user = await findLoginByUsername(session.username)
+  } catch (err) {
+    console.error('[auth/changePassword]', err)
+    return { error: 'Could not reach the database. Try again in a moment.' }
+  }
+  if (!user || !user.IS_ACTIVE) redirect('/login')   // account removed or disabled since sign-in
+
+  if (!(await verifyPassword(current, user.PASSWORD_HASH)))
+    return { error: 'Your current password is incorrect.' }
+  if (await verifyPassword(next, user.PASSWORD_HASH))
+    return { error: 'Choose a password different from your current one.' }
+
+  const hash = await hashPassword(next)
+  try {
+    await setOwnPassword(user.ID, hash)
+  } catch (err) {
+    console.error('[auth/changePassword] update failed', err)
+    return { error: 'Could not update the password. Try again in a moment.' }
+  }
+
+  redirect('/overview')
 }
 
 export async function logout(): Promise<void> {

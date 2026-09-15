@@ -12,12 +12,13 @@ import type { AccountStatus, AdminUserAction, AdminUserRow } from '@/types/auth'
 const USERS = 'dbo.TBL_WMS_AUTH_USERS'
 
 export interface AccountRecord {
-  ID:          number
-  USERNAME:    string
-  FULLNAME:    string
-  ROLE:        string
-  IS_ACTIVE:   boolean
-  APPROVED_AT: Date | null
+  ID:             number
+  USERNAME:       string
+  FULLNAME:       string
+  ROLE:           string
+  IS_ACTIVE:      boolean
+  APPROVED_AT:    Date | null
+  MUST_CHANGE_PW: boolean   // set after an admin reset, cleared when the user picks a new password
 }
 export interface LoginRecord extends AccountRecord {
   PASSWORD_HASH: string
@@ -28,7 +29,7 @@ export function statusOf(a: Pick<AccountRecord, 'IS_ACTIVE' | 'APPROVED_AT'>): A
   return a.IS_ACTIVE ? 'active' : a.APPROVED_AT ? 'disabled' : 'pending'
 }
 
-const ACCOUNT_COLS = 'ID, USERNAME, FULLNAME, ROLE, IS_ACTIVE, APPROVED_AT'
+const ACCOUNT_COLS = 'ID, USERNAME, FULLNAME, ROLE, IS_ACTIVE, APPROVED_AT, MUST_CHANGE_PW'
 
 export async function findLoginByUsername(username: string): Promise<LoginRecord | undefined> {
   const pool   = await getPool()
@@ -63,6 +64,31 @@ export async function stampLastLogin(id: number): Promise<void> {
     .query(`UPDATE ${USERS} SET LAST_LOGIN_AT = GETDATE() WHERE ID = @ID`)
 }
 
+// The user sets their own new password — clears the must-change flag.
+export async function setOwnPassword(id: number, passwordHash: string): Promise<void> {
+  const pool = await getPool()
+  await pool.request()
+    .input('ID',   sql.Int,         id)
+    .input('HASH', sql.VarChar(100), passwordHash)
+    .query(`UPDATE ${USERS}
+            SET PASSWORD_HASH = @HASH, MUST_CHANGE_PW = 0, PASSWORD_CHANGED_AT = GETDATE()
+            WHERE ID = @ID`)
+}
+
+// Admin sets a temporary password: the user must change it at next sign-in.
+// Only for established (approved) accounts, never a pending sign-up.
+// false when the account is gone or was never approved.
+export async function adminResetPassword(id: number, passwordHash: string): Promise<boolean> {
+  const pool   = await getPool()
+  const result = await pool.request()
+    .input('ID',   sql.Int,         id)
+    .input('HASH', sql.VarChar(100), passwordHash)
+    .query(`UPDATE ${USERS}
+            SET PASSWORD_HASH = @HASH, MUST_CHANGE_PW = 1, PASSWORD_CHANGED_AT = GETDATE()
+            WHERE ID = @ID AND APPROVED_AT IS NOT NULL`)
+  return result.rowsAffected[0] > 0
+}
+
 interface ListRow extends AccountRecord {
   CREATED_AT:    Date
   LAST_LOGIN_AT: Date | null
@@ -73,21 +99,22 @@ interface ListRow extends AccountRecord {
 export async function listAccounts(): Promise<AdminUserRow[]> {
   const pool   = await getPool()
   const result = await pool.request().query<ListRow>(`
-    SELECT U.ID, U.USERNAME, U.FULLNAME, U.ROLE, U.IS_ACTIVE, U.APPROVED_AT,
+    SELECT U.ID, U.USERNAME, U.FULLNAME, U.ROLE, U.IS_ACTIVE, U.APPROVED_AT, U.MUST_CHANGE_PW,
            U.CREATED_AT, U.LAST_LOGIN_AT, APPROVER = A.USERNAME
     FROM ${USERS} U
     LEFT JOIN ${USERS} A ON A.ID = U.APPROVED_BY
     ORDER BY CASE WHEN U.IS_ACTIVE = 0 AND U.APPROVED_AT IS NULL THEN 0 ELSE 1 END, U.CREATED_AT DESC`)
   return result.recordset.map(u => ({
-    id:          u.ID,
-    username:    u.USERNAME,
-    name:        u.FULLNAME,
-    role:        u.ROLE,
-    status:      statusOf(u),
-    createdAt:   u.CREATED_AT.toISOString(),
-    lastLoginAt: u.LAST_LOGIN_AT?.toISOString() ?? null,
-    approvedAt:  u.APPROVED_AT?.toISOString() ?? null,
-    approvedBy:  u.APPROVER,
+    id:           u.ID,
+    username:     u.USERNAME,
+    name:         u.FULLNAME,
+    role:         u.ROLE,
+    status:       statusOf(u),
+    mustChangePw: u.MUST_CHANGE_PW,
+    createdAt:    u.CREATED_AT.toISOString(),
+    lastLoginAt:  u.LAST_LOGIN_AT?.toISOString() ?? null,
+    approvedAt:   u.APPROVED_AT?.toISOString() ?? null,
+    approvedBy:   u.APPROVER,
   }))
 }
 
